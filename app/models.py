@@ -57,4 +57,4 @@ class Aviso(SQLModel, table=True):
     status: str
     data_expiracao: Optional[datetime] = None
     archive_url: Optional[str] = None
-    mensagem: str  # Campo adicional para avisos
+    mensagem: Optional[str] = None  # Campo adicional para avisos (opcional)

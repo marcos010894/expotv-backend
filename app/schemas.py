@@ -50,4 +50,4 @@ class AvisoCreate(BaseModel):
     nome_anunciante: Optional[str] = None
     status: str
     data_expiracao: Optional[datetime] = None
-    mensagem: str  # Campo adicional para avisos
+    mensagem: Optional[str] = None  # Campo adicional para avisos (opcional)

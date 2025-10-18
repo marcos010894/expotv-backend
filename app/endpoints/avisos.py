@@ -120,16 +120,18 @@ def get_avisos_by_sindico(sindico_id: int, session: Session = Depends(get_sessio
     description="Cria um novo aviso no sistema",
     response_description="Aviso criado com sucesso"
 )
-def create_aviso(
+async def create_aviso(
     nome: str = Form(..., description="Nome/título do aviso", example="Aviso Importante"),
     condominios_ids: str = Form(..., description="IDs dos condomínios (separados por vírgula)", example="1,2,3"),
     sindico_ids: Optional[str] = Form(None, description="IDs dos síndicos (separados por vírgula)", example="2,3"),
+    sindico_id: Optional[int] = Form(None, description="ID do síndico responsável"),
+    condominio_id: Optional[int] = Form(None, description="ID do condomínio principal"),
     numero_anunciante: Optional[str] = Form(None, description="Número de telefone do anunciante", example="11999887766"),
     nome_anunciante: Optional[str] = Form(None, description="Nome completo do anunciante", example="João Silva"),
     status: str = Form(..., description="Status do aviso", example="Ativo"),
     data_expiracao: Optional[datetime] = Form(None, description="Data de expiração do aviso (formato ISO)", example="2025-12-31T23:59:59"),
-    mensagem: str = Form(..., description="Mensagem do aviso", example="Esta é uma mensagem importante para os moradores"),
-    imagem: Optional[UploadFile] = File(
+    mensagem: Optional[str] = Form(None, description="Mensagem do aviso (opcional)", example="Esta é uma mensagem importante para os moradores"),
+    image: Optional[UploadFile] = File(
         None, 
         description="🖼️ Imagem do aviso (PNG, JPG, JPEG)",
         openapi_extra={
@@ -148,7 +150,7 @@ def create_aviso(
     - **status**: Status do aviso (ex: "Ativo", "Inativo")
     - **data_expiracao**: Data de vencimento (opcional)
     - **mensagem**: Conteúdo da mensagem do aviso
-    - **imagem**: Arquivo de imagem (opcional)
+    - **image**: Arquivo de imagem (opcional)
     
     ⚠️ VALIDAÇÃO: Verifica se o síndico não excedeu o limite de avisos permitidos
     """
@@ -199,9 +201,12 @@ def create_aviso(
     
     # 2. Fazer upload da imagem (se fornecida)
     archive_url = None
-    if imagem:
+    if image:
         try:
-            archive_url = upload_image_to_r2(imagem, "avisos")
+            # Ler o conteúdo do arquivo
+            file_content = await image.read()
+            # Fazer upload com os parâmetros corretos
+            archive_url = upload_image_to_r2(file_content, image.filename, image.content_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Erro ao fazer upload da imagem: {str(e)}")
     
@@ -278,9 +283,9 @@ def update_aviso(
     description="Substitui a imagem de um aviso existente",
     response_description="Imagem atualizada com sucesso"
 )
-def update_aviso_image(
+async def update_aviso_image(
     aviso_id: int,
-    imagem: UploadFile = File(
+    image: UploadFile = File(
         ..., 
         description="🖼️ Nova imagem do aviso (PNG, JPG, JPEG)",
         openapi_extra={
@@ -302,7 +307,10 @@ def update_aviso_image(
     
     # Fazer upload da nova imagem
     try:
-        new_archive_url = upload_image_to_r2(imagem, "avisos")
+        # Ler o conteúdo do arquivo
+        file_content = await image.read()
+        # Fazer upload com os parâmetros corretos
+        new_archive_url = upload_image_to_r2(file_content, image.filename, image.content_type)
         db_aviso.archive_url = new_archive_url
         
         session.add(db_aviso)
