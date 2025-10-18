@@ -27,6 +27,25 @@ app.add_middleware(
     allow_headers=["*"],  # Permite todos os headers
 )
 
+# Health check endpoint
+@app.get("/", tags=["Health"])
+async def root():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "service": "EXPO-TV API",
+        "version": "1.0.0"
+    }
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check detalhado"""
+    return {
+        "status": "healthy",
+        "service": "EXPO-TV API",
+        "version": "1.0.0"
+    }
+
 app.include_router(auth_router, tags=["Autenticação"])
 app.include_router(users_router, tags=["Usuários"])
 app.include_router(condominios_router, tags=["Condomínios"])
@@ -43,13 +62,17 @@ async def startup_event():
     Evento executado quando a aplicação inicia
     Inicia os serviços de monitoramento em background
     """
-    from app.services.tv_monitor import start_tv_monitor
-    from app.services.expiration_monitor import start_expiration_monitor
-    
-    # Iniciar monitor de TVs (verifica a cada 1 minuto)
-    start_tv_monitor()
-    
-    # Iniciar monitor de expiração (verifica a cada 1 hora)
-    start_expiration_monitor()
-    
-    print("🚀 Monitores em background iniciados com sucesso!")
+    try:
+        from app.services.tv_monitor import start_tv_monitor
+        from app.services.expiration_monitor import start_expiration_monitor
+        
+        # Iniciar monitor de TVs (verifica a cada 1 minuto)
+        start_tv_monitor()
+        
+        # Iniciar monitor de expiração (verifica a cada 1 hora)
+        start_expiration_monitor()
+        
+        print("🚀 Monitores em background iniciados com sucesso!")
+    except Exception as e:
+        print(f"⚠️ Aviso: Erro ao iniciar monitores: {e}")
+        print("Aplicação continuará funcionando sem monitores")
