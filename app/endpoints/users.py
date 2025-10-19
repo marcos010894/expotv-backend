@@ -13,7 +13,7 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-@router.get("/users", summary="Listar usuários", description="Lista todos os usuários do sistema")
+@router.get("/users/", summary="Listar usuários", description="Lista todos os usuários do sistema")
 def get_all_users(session: Session = Depends(get_session)):
     users = session.exec(select(User)).all()
     return users
@@ -25,7 +25,7 @@ def get_user(user_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return user
 
-@router.post("/users", summary="Criar usuário", description="Cria um novo usuário no sistema")
+@router.post("/users/", summary="Criar usuário", description="Cria um novo usuário no sistema")
 def create_user(user_data: UserCreate, session: Session = Depends(get_session)):
     # Hash da senha antes de salvar
     hashed_password = get_password_hash(user_data.senha)
