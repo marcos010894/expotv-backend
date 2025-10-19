@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import RedirectResponse
 
 from app.endpoints.users import router as users_router
 from app.endpoints.condominios import router as condominios_router
@@ -15,8 +18,24 @@ app = FastAPI(
     description="Sistema de gerenciamento para TVs em condomínios",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    redirect_slashes=False  # Desabilita redirect automático de trailing slash
 )
+
+# Middleware para garantir HTTPS em redirects
+class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Se vier do Fly.io proxy, usar sempre HTTPS nos redirects
+        if request.headers.get("x-forwarded-proto") == "http":
+            # Força HTTPS
+            url = request.url.replace(scheme="https")
+            return RedirectResponse(url=str(url), status_code=301)
+        
+        response = await call_next(request)
+        return response
+
+# Adicionar middleware de HTTPS redirect
+app.add_middleware(HTTPSRedirectMiddleware)
 
 # Configurar CORS para aceitar requisições de qualquer lugar
 app.add_middleware(

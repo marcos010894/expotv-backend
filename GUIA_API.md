@@ -383,13 +383,28 @@ Headers: Authorization: Bearer {token}
 
 ---
 
-## 📞 Contatos e Suporte
+## 📞 URLs da API
 
-**Base URL:** `http://localhost:8000` (desenvolvimento)
+### 🌐 Produção (Fly.io)
+**Base URL:** `https://expotv-backend.fly.dev`
+
+**Documentação Interativa:**
+- Swagger UI: `https://expotv-backend.fly.dev/docs`
+- ReDoc: `https://expotv-backend.fly.dev/redoc`
+- Health Check: `https://expotv-backend.fly.dev/health`
+
+### 💻 Desenvolvimento (Local)
+**Base URL:** `http://localhost:8000`
 
 **Documentação Interativa:**
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+- Health Check: `http://localhost:8000/health`
+
+### ⚠️ IMPORTANTE - Mixed Content
+**SEMPRE use HTTPS em produção!**
+- ✅ `https://expotv-backend.fly.dev`
+- ❌ `http://expotv-backend.fly.dev` (será bloqueado pelo navegador)
 
 **Token:** Válido por 30 dias (43200 minutos)
 
