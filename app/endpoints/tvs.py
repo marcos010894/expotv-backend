@@ -12,7 +12,7 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-@router.get("/tvs/", summary="Listar TVs", description="Lista todas as TVs do sistema")
+@router.get("/tvs", summary="Listar TVs", description="Lista todas as TVs do sistema")
 def get_all_tvs(session: Session = Depends(get_session)):
     tvs = session.exec(select(TV)).all()
     return tvs
@@ -24,7 +24,7 @@ def get_tv(tv_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="TV não encontrada")
     return tv
 
-@router.post("/tvs/", summary="Criar TV", description="Cria nova TV e gera código de conexão automaticamente")
+@router.post("/tvs", summary="Criar TV", description="Cria nova TV e gera código de conexão automaticamente")
 def create_tv(tv_data: TVCreate, session: Session = Depends(get_session)):
     tv = TV(
         nome=tv_data.nome,

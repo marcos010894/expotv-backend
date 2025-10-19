@@ -27,7 +27,7 @@ class AvisoWithSindico(BaseModel):
     archive_url: Optional[str]
     mensagem: str
 
-@router.get("/avisos/", 
+@router.get("/avisos", 
     summary="📋 Listar Avisos", 
     description="Lista todos os avisos cadastrados no sistema com ID do síndico responsável",
     response_description="Lista de avisos com síndicos",
@@ -115,7 +115,7 @@ def get_avisos_by_sindico(sindico_id: int, session: Session = Depends(get_sessio
     
     return avisos_do_sindico
 
-@router.post("/avisos/", 
+@router.post("/avisos", 
     summary="➕ Criar Aviso", 
     description="Cria um novo aviso no sistema",
     response_description="Aviso criado com sucesso"

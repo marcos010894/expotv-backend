@@ -11,12 +11,12 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-@router.get("/condominios/", summary="Listar condomínios", description="Lista todos os condomínios do sistema")
+@router.get("/condominios", summary="Listar condomínios", description="Lista todos os condomínios do sistema")
 def get_all_condominios(session: Session = Depends(get_session)):
     condominios = session.exec(select(Condominio)).all()
     return condominios
 
-@router.post("/condominios/", summary="Criar condomínio", description="Cria um novo condomínio")
+@router.post("/condominios", summary="Criar condomínio", description="Cria um novo condomínio")
 def create_condominio(condominio_data: CondominioCreate, session: Session = Depends(get_session)):
     condominio = Condominio(
         nome=condominio_data.nome,
