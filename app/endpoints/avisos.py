@@ -115,7 +115,7 @@ def get_avisos_by_sindico(sindico_id: int, session: Session = Depends(get_sessio
     
     return avisos_do_sindico
 
-@router.post("/avisos", 
+@router.post("/avisos/", 
     summary="➕ Criar Aviso", 
     description="Cria um novo aviso no sistema",
     response_description="Aviso criado com sucesso"
