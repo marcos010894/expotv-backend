@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import Anuncio
 from app.schemas import AnuncioCreate
-from app.storage import upload_image_to_r2, delete_image_from_r2
+from app.storage import upload_image_to_r2, upload_media_to_r2, delete_image_from_r2
 from typing import Optional
 from datetime import datetime
 
@@ -33,9 +33,9 @@ def get_anuncio(anuncio_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Anúncio não encontrado")
     return anuncio
 
-@router.post("/anuncios/", 
+@router.post("/anuncios", 
     summary="📢 Criar Anúncio", 
-    description="Cria um novo anúncio/alerta para exibição nas TVs dos condomínios. Você pode incluir uma imagem opcional.",
+    description="Cria um novo anúncio/alerta para exibição nas TVs dos condomínios. Você pode incluir uma imagem ou vídeo.",
     response_description="Anúncio criado com sucesso"
 )
 async def create_anuncio(
@@ -46,35 +46,43 @@ async def create_anuncio(
     status: str = Form(..., description="Status do anúncio", example="Ativo"),
     data_expiracao: Optional[datetime] = Form(None, description="Data de expiração do anúncio (formato ISO)", example="2025-12-31T23:59:59"),
     tempo_exibicao: int = Form(10, description="Tempo de exibição em segundos (padrão: 10s)", example=10, ge=1, le=300),
-    image: Optional[UploadFile] = File(
+    media: Optional[UploadFile] = File(
         None, 
-        description="🖼️ Imagem do anúncio (PNG, JPG, JPEG) - Opcional",
+        description="🎬 Mídia do anúncio (Imagem: PNG, JPG, JPEG, WebP | Vídeo: MP4, MOV, AVI, WebM) - Opcional",
         openapi_extra={
-            "example": "anuncio.png"
+            "example": "anuncio.mp4"
         }
     ),
     session: Session = Depends(get_session)
 ):
     archive_url = ""
     
-    # Se tem imagem, fazer upload
-    if image and image.filename:
-        # Validar tipo de arquivo
-        allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
-        if image.content_type not in allowed_types:
+    # Se tem mídia (imagem ou vídeo), fazer upload
+    if media and media.filename:
+        # Tipos de mídia permitidos
+        allowed_image_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+        allowed_video_types = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']
+        allowed_types = allowed_image_types + allowed_video_types
+        
+        if media.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Tipo de arquivo não suportado. Tipos aceitos: PNG, JPG, JPEG, WebP"
+                detail=f"Tipo de arquivo não suportado. Tipos aceitos: Imagens (PNG, JPG, JPEG, WebP, GIF) ou Vídeos (MP4, MOV, AVI, WebM, MPEG)"
             )
         
-        # Validar tamanho do arquivo (máximo 5MB)
-        if hasattr(image, 'size') and image.size > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Arquivo muito grande. Máximo: 5MB")
+        # Validar tamanho do arquivo
+        # Imagens: máximo 5MB
+        # Vídeos: máximo 50MB
+        max_size = 50 * 1024 * 1024 if media.content_type in allowed_video_types else 5 * 1024 * 1024
+        max_size_text = "50MB" if media.content_type in allowed_video_types else "5MB"
+        
+        if hasattr(media, 'size') and media.size > max_size:
+            raise HTTPException(status_code=400, detail=f"Arquivo muito grande. Máximo: {max_size_text}")
         
         try:
             # Upload para R2
-            image_content = await image.read()
-            archive_url = upload_image_to_r2(image_content, image.filename, image.content_type)
+            media_content = await media.read()
+            archive_url = upload_media_to_r2(media_content, media.filename, media.content_type, "anuncios")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erro no upload: {str(e)}")
     

@@ -54,12 +54,46 @@ def upload_image_to_r2(file_content: bytes, filename: str, content_type: str) ->
     except Exception as e:
         raise Exception(f"Erro no upload: {str(e)}")
 
-def delete_image_from_r2(image_url: str) -> bool:
+def upload_media_to_r2(file_content: bytes, filename: str, content_type: str, media_type: str = "anuncios") -> str:
     """
-    Remove uma imagem do R2
+    Faz upload de mídia (imagem ou vídeo) para o Cloudflare R2
     
     Args:
-        image_url: URL da imagem a ser removida
+        file_content: Conteúdo do arquivo em bytes
+        filename: Nome original do arquivo
+        content_type: Tipo MIME do arquivo
+        media_type: Tipo de pasta (anuncios, avisos, etc)
+    
+    Returns:
+        URL pública da mídia
+    """
+    try:
+        # Gerar nome único para o arquivo
+        file_extension = filename.split('.')[-1] if '.' in filename else 'jpg'
+        unique_filename = f"{media_type}/{datetime.now().strftime('%Y/%m/%d')}/{uuid.uuid4()}.{file_extension}"
+        
+        # Upload para R2
+        s3_client.put_object(
+            Bucket=R2_BUCKET,
+            Key=unique_filename,
+            Body=file_content,
+            ContentType=content_type,
+            ACL='public-read'  # Tornar público
+        )
+        
+        # Retornar URL pública personalizada
+        public_url = f"{R2_PUBLIC_URL}/{unique_filename}"
+        return public_url
+        
+    except Exception as e:
+        raise Exception(f"Erro no upload: {str(e)}")
+
+def delete_image_from_r2(image_url: str) -> bool:
+    """
+    Remove uma imagem ou vídeo do R2
+    
+    Args:
+        image_url: URL da mídia a ser removida
     
     Returns:
         True se removido com sucesso
@@ -76,5 +110,5 @@ def delete_image_from_r2(image_url: str) -> bool:
         return True
         
     except Exception as e:
-        print(f"Erro ao deletar imagem: {str(e)}")
+        print(f"Erro ao deletar mídia: {str(e)}")
         return False

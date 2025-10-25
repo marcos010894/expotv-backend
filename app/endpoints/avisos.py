@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import Aviso, Condominio, User
 from app.schemas import AvisoCreate
-from app.storage import upload_image_to_r2, delete_image_from_r2
+from app.storage import upload_image_to_r2, upload_media_to_r2, delete_image_from_r2
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
@@ -115,9 +115,9 @@ def get_avisos_by_sindico(sindico_id: int, session: Session = Depends(get_sessio
     
     return avisos_do_sindico
 
-@router.post("/avisos/", 
+@router.post("/avisos", 
     summary="➕ Criar Aviso", 
-    description="Cria um novo aviso no sistema",
+    description="Cria um novo aviso no sistema. Aceita imagem ou vídeo.",
     response_description="Aviso criado com sucesso"
 )
 async def create_aviso(
@@ -131,11 +131,11 @@ async def create_aviso(
     status: str = Form(..., description="Status do aviso", example="Ativo"),
     data_expiracao: Optional[datetime] = Form(None, description="Data de expiração do aviso (formato ISO)", example="2025-12-31T23:59:59"),
     mensagem: Optional[str] = Form(None, description="Mensagem do aviso (opcional)", example="Esta é uma mensagem importante para os moradores"),
-    image: Optional[UploadFile] = File(
+    media: Optional[UploadFile] = File(
         None, 
-        description="🖼️ Imagem do aviso (PNG, JPG, JPEG)",
+        description="🎬 Mídia do aviso (Imagem: PNG, JPG, JPEG, WebP, GIF | Vídeo: MP4, MOV, AVI, WebM, MPEG) - Opcional",
         openapi_extra={
-            "example": "imagem_aviso.png"
+            "example": "aviso.mp4"
         }
     ),
     session: Session = Depends(get_session)
@@ -149,10 +149,14 @@ async def create_aviso(
     - **nome_anunciante**: Nome do responsável (opcional)
     - **status**: Status do aviso (ex: "Ativo", "Inativo")
     - **data_expiracao**: Data de vencimento (opcional)
-    - **mensagem**: Conteúdo da mensagem do aviso
-    - **image**: Arquivo de imagem (opcional)
+    - **mensagem**: Conteúdo da mensagem do aviso (opcional)
+    - **media**: Arquivo de imagem ou vídeo (opcional)
     
     ⚠️ VALIDAÇÃO: Verifica se o síndico não excedeu o limite de avisos permitidos
+    
+    📦 Formatos aceitos:
+    - Imagens: PNG, JPG, JPEG, WebP, GIF (máx 5MB)
+    - Vídeos: MP4, MOV, AVI, WebM, MPEG (máx 50MB)
     """
     
     # 1. Validar limite de avisos por síndico
@@ -199,16 +203,34 @@ async def create_aviso(
                 detail=f"Síndico '{sindico.nome}' atingiu o limite de {sindico.limite_avisos} avisos permitidos. Atualmente possui {len(avisos_do_sindico)} avisos."
             )
     
-    # 2. Fazer upload da imagem (se fornecida)
+    # 2. Fazer upload da mídia (imagem ou vídeo) se fornecida
     archive_url = None
-    if image:
+    if media and media.filename:
+        # Tipos de mídia permitidos
+        allowed_image_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+        allowed_video_types = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']
+        allowed_types = allowed_image_types + allowed_video_types
+        
+        if media.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tipo de arquivo não suportado. Tipos aceitos: Imagens (PNG, JPG, JPEG, WebP, GIF) ou Vídeos (MP4, MOV, AVI, WebM, MPEG)"
+            )
+        
+        # Validar tamanho do arquivo
+        max_size = 50 * 1024 * 1024 if media.content_type in allowed_video_types else 5 * 1024 * 1024
+        max_size_text = "50MB" if media.content_type in allowed_video_types else "5MB"
+        
+        if hasattr(media, 'size') and media.size > max_size:
+            raise HTTPException(status_code=400, detail=f"Arquivo muito grande. Máximo: {max_size_text}")
+        
         try:
             # Ler o conteúdo do arquivo
-            file_content = await image.read()
-            # Fazer upload com os parâmetros corretos
-            archive_url = upload_image_to_r2(file_content, image.filename, image.content_type)
+            file_content = await media.read()
+            # Fazer upload usando a função de mídia
+            archive_url = upload_media_to_r2(file_content, media.filename, media.content_type, "avisos")
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Erro ao fazer upload da imagem: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Erro ao fazer upload da mídia: {str(e)}")
     
     db_aviso = Aviso(
         nome=nome,
