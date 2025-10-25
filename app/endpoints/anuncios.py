@@ -20,6 +20,9 @@ def get_session():
 )
 def get_all_anuncios(session: Session = Depends(get_session)):
     anuncios = session.exec(select(Anuncio)).all()
+    # Debug: Imprimir archive_url de cada anúncio
+    for a in anuncios:
+        print(f"Anúncio #{a.id}: nome={a.nome}, archive_url={a.archive_url}")
     return anuncios
 
 @router.get("/anuncios/{anuncio_id}", 
@@ -83,10 +86,13 @@ async def create_anuncio(
             # Upload para R2
             media_content = await media.read()
             archive_url = upload_media_to_r2(media_content, media.filename, media.content_type, "anuncios")
+            print(f"✅ Upload bem-sucedido! URL: {archive_url}")
         except Exception as e:
+            print(f"❌ Erro no upload: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro no upload: {str(e)}")
     
     # Criar anúncio
+    print(f"📝 Criando anúncio com archive_url: {archive_url}")
     anuncio = Anuncio(
         nome=nome,
         condominios_ids=condominios_ids,
@@ -101,6 +107,9 @@ async def create_anuncio(
     session.add(anuncio)
     session.commit()
     session.refresh(anuncio)
+    
+    print(f"✅ Anúncio salvo! ID: {anuncio.id}, archive_url: {anuncio.archive_url}")
+    
     return anuncio
 
 @router.put("/anuncios/{anuncio_id}", 
