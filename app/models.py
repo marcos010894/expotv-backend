@@ -34,6 +34,7 @@ class TV(SQLModel, table=True):
     status: str  # 'online' ou 'offline'
     template: Optional[str] = None
     data_registro: datetime = Field(default_factory=datetime.utcnow)
+    last_ping: Optional[datetime] = None  # Último ping recebido da TV
     condominio: Optional[Condominio] = Relationship(back_populates="tvs")
 
 class Anuncio(SQLModel, table=True):

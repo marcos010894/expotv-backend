@@ -69,14 +69,53 @@ def update_tv_status(codigo_conexao: str, session: Session = Depends(get_session
     if not tv:
         raise HTTPException(status_code=404, detail="TV não encontrada")
     tv.status = "online"
+    tv.last_ping = datetime.now()  # Atualizar timestamp do último ping
     session.add(tv)
     session.commit()
     session.refresh(tv)
     return tv
+
+@router.post("/tvs/{codigo_conexao}/ping", summary="💓 Heartbeat da TV", description="Endpoint que a TV deve chamar a cada 1-2 minutos para manter status online")
+def tv_heartbeat(codigo_conexao: str, session: Session = Depends(get_session)):
+    """
+    Endpoint de heartbeat/ping para TVs
+    
+    A TV deve chamar este endpoint a cada 1-2 minutos para:
+    - Manter status como 'online'
+    - Atualizar timestamp do último ping
+    - Evitar ser marcada como offline pelo monitor
+    
+    Args:
+        codigo_conexao: Código único de conexão da TV
+    
+    Returns:
+        Status da TV e timestamp do ping
+    """
+    tv = session.exec(select(TV).where(TV.codigo_conexao == codigo_conexao)).first()
+    if not tv:
+        raise HTTPException(status_code=404, detail="TV não encontrada com este código")
+    
+    # Atualizar status e último ping
+    tv.status = "online"
+    tv.last_ping = datetime.now()
+    session.add(tv)
+    session.commit()
+    session.refresh(tv)
+    
+    return {
+        "success": True,
+        "status": tv.status,
+        "last_ping": tv.last_ping,
+        "message": "Heartbeat registrado com sucesso"
+    }
 
 @router.get("/tvs/{codigo_conexao}/status", summary="Status da TV", description="Verifica status da TV pelo código de conexão")
 def get_tv_status(codigo_conexao: str, session: Session = Depends(get_session)):
     tv = session.exec(select(TV).where(TV.codigo_conexao == codigo_conexao)).first()
     if not tv:
         raise HTTPException(status_code=404, detail="TV não encontrada")
-    return {"status": tv.status}
+    return {
+        "status": tv.status,
+        "last_ping": tv.last_ping,
+        "nome": tv.nome
+    }
