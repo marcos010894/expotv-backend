@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import Aviso, Condominio, User
 from app.schemas import AvisoCreate
-from app.storage import upload_image_to_r2, upload_media_to_r2, delete_image_from_r2
+from app.storage import upload_image_to_r2, delete_image_from_r2
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
@@ -227,8 +227,8 @@ async def create_aviso(
         try:
             # Ler o conteúdo do arquivo
             file_content = await media.read()
-            # Fazer upload usando a função de mídia
-            archive_url = upload_media_to_r2(file_content, media.filename, media.content_type, "avisos")
+            # Fazer upload usando a função de imagem (funciona para vídeo também)
+            archive_url = upload_image_to_r2(file_content, media.filename, media.content_type)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Erro ao fazer upload da mídia: {str(e)}")
     

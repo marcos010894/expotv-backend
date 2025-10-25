@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from app.db import engine
 from app.models import Anuncio
 from app.schemas import AnuncioCreate
-from app.storage import upload_image_to_r2, upload_media_to_r2, delete_image_from_r2
+from app.storage import upload_image_to_r2, delete_image_from_r2
 from typing import Optional
 from datetime import datetime
 
@@ -20,9 +20,6 @@ def get_session():
 )
 def get_all_anuncios(session: Session = Depends(get_session)):
     anuncios = session.exec(select(Anuncio)).all()
-    # Debug: Imprimir archive_url de cada anúncio
-    for a in anuncios:
-        print(f"Anúncio #{a.id}: nome={a.nome}, archive_url={a.archive_url}")
     return anuncios
 
 @router.get("/anuncios/{anuncio_id}", 
@@ -49,50 +46,41 @@ async def create_anuncio(
     status: str = Form(..., description="Status do anúncio", example="Ativo"),
     data_expiracao: Optional[datetime] = Form(None, description="Data de expiração do anúncio (formato ISO)", example="2025-12-31T23:59:59"),
     tempo_exibicao: int = Form(10, description="Tempo de exibição em segundos (padrão: 10s)", example=10, ge=1, le=300),
-    media: Optional[UploadFile] = File(
+    image: Optional[UploadFile] = File(
         None, 
-        description="🎬 Mídia do anúncio (Imagem: PNG, JPG, JPEG, WebP | Vídeo: MP4, MOV, AVI, WebM) - Opcional",
+        description="🖼️ Imagem/Vídeo do anúncio (PNG, JPG, JPEG, WebP, MP4, MOV, AVI, WebM) - Opcional",
         openapi_extra={
-            "example": "anuncio.mp4"
+            "example": "anuncio.png"
         }
     ),
     session: Session = Depends(get_session)
 ):
     archive_url = ""
     
-    # Se tem mídia (imagem ou vídeo), fazer upload
-    if media and media.filename:
-        # Tipos de mídia permitidos
-        allowed_image_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
-        allowed_video_types = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']
-        allowed_types = allowed_image_types + allowed_video_types
+    # Se tem imagem/vídeo, fazer upload
+    if image and image.filename:
+        # Validar tipo de arquivo (imagem ou vídeo)
+        allowed_types = [
+            'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+            'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg'
+        ]
         
-        if media.content_type not in allowed_types:
+        if image.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Tipo de arquivo não suportado. Tipos aceitos: Imagens (PNG, JPG, JPEG, WebP, GIF) ou Vídeos (MP4, MOV, AVI, WebM, MPEG)"
+                detail=f"Tipo de arquivo não suportado. Envie PNG, JPG, WebP, GIF, MP4, MOV, AVI ou WebM"
             )
         
-        # Validar tamanho do arquivo
-        # Imagens: máximo 5MB
-        # Vídeos: máximo 50MB
-        max_size = 50 * 1024 * 1024 if media.content_type in allowed_video_types else 5 * 1024 * 1024
-        max_size_text = "50MB" if media.content_type in allowed_video_types else "5MB"
-        
-        if hasattr(media, 'size') and media.size > max_size:
-            raise HTTPException(status_code=400, detail=f"Arquivo muito grande. Máximo: {max_size_text}")
-        
         try:
-            # Upload para R2
-            media_content = await media.read()
-            archive_url = upload_media_to_r2(media_content, media.filename, media.content_type, "anuncios")
-            print(f"✅ Upload bem-sucedido! URL: {archive_url}")
+            # Upload para R2 (usa a função original que já funciona)
+            image_content = await image.read()
+            archive_url = upload_image_to_r2(image_content, image.filename, image.content_type)
         except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro no upload: {str(e)}")
             print(f"❌ Erro no upload: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro no upload: {str(e)}")
     
     # Criar anúncio
-    print(f"📝 Criando anúncio com archive_url: {archive_url}")
     anuncio = Anuncio(
         nome=nome,
         condominios_ids=condominios_ids,
@@ -107,8 +95,6 @@ async def create_anuncio(
     session.add(anuncio)
     session.commit()
     session.refresh(anuncio)
-    
-    print(f"✅ Anúncio salvo! ID: {anuncio.id}, archive_url: {anuncio.archive_url}")
     
     return anuncio
 
