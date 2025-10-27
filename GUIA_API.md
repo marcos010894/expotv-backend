@@ -38,6 +38,80 @@ Adicione o header em **todas as requisições protegidas**:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+### Recuperação de Senha
+
+#### Solicitar Reset de Senha
+```
+POST /forgot-password
+Content-Type: application/json
+
+{
+  "email": "usuario@email.com"
+}
+```
+
+**Resposta:**
+```json
+{
+  "message": "Se o email existir, você receberá instruções para redefinir sua senha"
+}
+```
+
+**O que acontece:**
+1. Backend gera token único válido por 1 hora
+2. Envia email para o usuário com link:
+   ```
+   https://expotv-backend.fly.dev/reset-password-page?token={TOKEN}
+   ```
+3. Usuário clica no link e é direcionado para página de reset
+4. Usuário define nova senha na página HTML
+5. Sistema valida token e atualiza senha
+6. Email de confirmação é enviado
+
+#### Redefinir Senha (via API)
+```
+POST /reset-password
+Content-Type: application/json
+
+{
+  "token": "token-recebido-por-email",
+  "new_password": "nova-senha-segura"
+}
+```
+
+**Resposta Sucesso:**
+```json
+{
+  "message": "Senha redefinida com sucesso"
+}
+```
+
+**Resposta Erro:**
+```json
+{
+  "detail": "Token inválido ou expirado"
+}
+```
+
+#### Trocar Senha (Usuário Logado)
+```
+POST /change-password
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "current_password": "senha-atual",
+  "new_password": "nova-senha"
+}
+```
+
+**Página de Reset:**
+- URL: https://expotv-backend.fly.dev/reset-password-page?token={TOKEN}
+- Interface HTML completa hospedada no backend
+- Validação em tempo real
+- Design responsivo
+- Redirecionamento automático após sucesso
+
 ---
 
 ## 📡 Endpoints Principais

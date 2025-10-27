@@ -4,12 +4,28 @@ import os
 from datetime import datetime
 import uuid
 
-# Configurações do Cloudflare R2
-R2_ENDPOINT = "https://6d3e10284be29ce7a44f10d4dc047ad4.r2.cloudflarestorage.com"
-R2_BUCKET = "ged"
-R2_PUBLIC_URL = "https://pub-44038362d56e40da83d1c72eaec658c5.r2.dev"  # URL pública personalizada
-R2_ACCESS_KEY = "77a2210f3311c69b54b2663a3dfe9b4b"
-R2_SECRET_KEY = "8c5968c864386322f9afc7f5b6c99ef6e3c91a078c0987a9fd4db1c033fce22d"
+# Carregar variáveis de ambiente do .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # Em produção, variáveis já estarão no ambiente
+
+# Configurações do Cloudflare R2 a partir de variáveis de ambiente
+R2_ENDPOINT = os.getenv(
+    "R2_ENDPOINT", 
+    "https://6d3e10284be29ce7a44f10d4dc047ad4.r2.cloudflarestorage.com"
+)
+R2_BUCKET = os.getenv("R2_BUCKET_NAME", "ged")
+R2_PUBLIC_URL = os.getenv(
+    "R2_PUBLIC_URL", 
+    "https://pub-44038362d56e40da83d1c72eaec658c5.r2.dev"
+)
+R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY_ID", "77a2210f3311c69b54b2663a3dfe9b4b")
+R2_SECRET_KEY = os.getenv(
+    "R2_SECRET_ACCESS_KEY", 
+    "8c5968c864386322f9afc7f5b6c99ef6e3c91a078c0987a9fd4db1c033fce22d"
+)
 
 # Cliente S3 compatível para R2
 s3_client = boto3.client(

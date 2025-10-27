@@ -4,6 +4,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 import os
 
+# Carregar variáveis de ambiente do .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # Em produção, variáveis já estarão no ambiente
+
 # Configurações de segurança
 SECRET_KEY = os.getenv("SECRET_KEY", "sua-chave-secreta-super-segura-mude-em-producao-2025")
 ALGORITHM = "HS256"

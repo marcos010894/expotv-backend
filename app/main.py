@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse
+import os
 
 from app.endpoints.users import router as users_router
 from app.endpoints.condominios import router as condominios_router
@@ -64,6 +66,23 @@ async def health_check():
         "service": "EXPO-TV API",
         "version": "1.0.0"
     }
+
+# Página de reset de senha
+@app.get("/reset-password-page", response_class=HTMLResponse, tags=["Autenticação"])
+async def reset_password_page():
+    """Página HTML para redefinir senha"""
+    html_path = os.path.join(os.path.dirname(__file__), "..", "static", "reset-password.html")
+    
+    if not os.path.exists(html_path):
+        return HTMLResponse(
+            content="<h1>Página não encontrada</h1>",
+            status_code=404
+        )
+    
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    return HTMLResponse(content=html_content)
 
 app.include_router(auth_router, tags=["Autenticação"])
 app.include_router(users_router, tags=["Usuários"])

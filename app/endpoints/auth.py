@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Optional, List
 from app.db import engine
 from app.models import User, Condominio
 from app.auth import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, verify_token
+from app.email_service import send_password_reset_email, send_password_changed_notification
 from pydantic import BaseModel, EmailStr
+import secrets
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -302,4 +304,210 @@ async def verify_token_endpoint(
         "email": user.email,
         "name": user.nome,
         "type": user.tipo
+    }
+
+
+# ===== Schemas para Recuperação de Senha =====
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+# ===== Endpoints de Recuperação de Senha =====
+
+@router.post("/forgot-password",
+    summary="🔐 Solicitar Recuperação de Senha",
+    description="Envia email com link para redefinir senha se o email existir no sistema",
+    response_description="Mensagem de confirmação"
+)
+def forgot_password(
+    request: ForgotPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    Solicita recuperação de senha:
+    
+    - **email**: Email cadastrado no sistema
+    
+    ⚠️ Por segurança, sempre retorna sucesso mesmo se o email não existir
+    
+    Se o email existir:
+    - Gera token único de recuperação
+    - Define validade de 1 hora
+    - Envia email com link de redefinição
+    
+    O link enviado será: {FRONTEND_URL}/reset-password?token={TOKEN}
+    """
+    
+    # Buscar usuário pelo email
+    user = session.exec(select(User).where(User.email == request.email)).first()
+    
+    # Por segurança, sempre retornar sucesso (não revelar se email existe)
+    response_message = {
+        "success": True,
+        "message": "Se o email estiver cadastrado, você receberá instruções para redefinir sua senha."
+    }
+    
+    if user:
+        # Gerar token único e seguro
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Definir expiração (1 hora a partir de agora)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        
+        # Salvar token e expiração no usuário
+        user.reset_token = reset_token
+        user.reset_token_expires = expires_at
+        
+        session.add(user)
+        session.commit()
+        
+        # Enviar email
+        email_sent = send_password_reset_email(
+            to_email=user.email,
+            reset_token=reset_token,
+            user_name=user.nome
+        )
+        
+        if email_sent:
+            print(f"✅ Email de recuperação enviado para {user.email}")
+        else:
+            print(f"⚠️ Falha ao enviar email, mas token foi gerado: {reset_token}")
+            # Em desenvolvimento, incluir token na resposta
+            import os
+            if os.getenv("ENV") == "development":
+                response_message["dev_token"] = reset_token
+    
+    return response_message
+
+
+@router.post("/reset-password",
+    summary="🔑 Redefinir Senha",
+    description="Redefine a senha usando o token enviado por email",
+    response_description="Confirmação de senha alterada"
+)
+def reset_password(
+    request: ResetPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    Redefine a senha do usuário:
+    
+    - **token**: Token recebido por email
+    - **new_password**: Nova senha (mínimo 6 caracteres)
+    
+    Validações:
+    - Token deve existir e não estar expirado (1 hora de validade)
+    - Nova senha deve ter no mínimo 6 caracteres
+    
+    Após sucesso:
+    - Senha é alterada
+    - Token é invalidado
+    - Email de confirmação é enviado
+    """
+    
+    # Validar senha
+    if len(request.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A nova senha deve ter no mínimo 6 caracteres"
+        )
+    
+    # Buscar usuário pelo token
+    user = session.exec(
+        select(User).where(User.reset_token == request.token)
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token inválido ou expirado"
+        )
+    
+    # Verificar se token expirou
+    if not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        # Limpar token expirado
+        user.reset_token = None
+        user.reset_token_expires = None
+        session.add(user)
+        session.commit()
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token expirado. Solicite uma nova recuperação de senha."
+        )
+    
+    # Alterar senha
+    user.senha = get_password_hash(request.new_password)
+    
+    # Invalidar token de reset
+    user.reset_token = None
+    user.reset_token_expires = None
+    
+    # Atualizar data de modificação
+    user.data_update = datetime.utcnow()
+    
+    session.add(user)
+    session.commit()
+    
+    # Enviar email de confirmação
+    send_password_changed_notification(user.email, user.nome)
+    
+    return {
+        "success": True,
+        "message": "Senha alterada com sucesso! Você já pode fazer login com a nova senha."
+    }
+
+
+@router.post("/change-password",
+    summary="🔐 Alterar Senha (Autenticado)",
+    description="Permite usuário logado alterar sua própria senha",
+    response_description="Confirmação de senha alterada"
+)
+def change_password(
+    old_password: str,
+    new_password: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Altera a senha do usuário logado:
+    
+    - **old_password**: Senha atual (para confirmação)
+    - **new_password**: Nova senha (mínimo 6 caracteres)
+    
+    Requer autenticação (Bearer token)
+    """
+    
+    # Validar senha atual
+    if not verify_password(old_password, current_user.senha):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta"
+        )
+    
+    # Validar nova senha
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A nova senha deve ter no mínimo 6 caracteres"
+        )
+    
+    # Alterar senha
+    current_user.senha = get_password_hash(new_password)
+    current_user.data_update = datetime.utcnow()
+    
+    session.add(current_user)
+    session.commit()
+    
+    # Enviar notificação
+    send_password_changed_notification(current_user.email, current_user.nome)
+    
+    return {
+        "success": True,
+        "message": "Senha alterada com sucesso!"
     }

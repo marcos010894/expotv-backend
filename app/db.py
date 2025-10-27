@@ -1,13 +1,21 @@
 from sqlmodel import SQLModel, create_engine
 import pymysql
 from urllib.parse import quote_plus
+import os
 
-# Configuração do banco de dados MySQL
-usuario = "u441041902_exportv"
-senha = quote_plus("Mito010894@@")  # Codificar caracteres especiais
-host = "193.203.175.53"
-banco = "u441041902_exportv"
-porta = 3306
+# Carregar variáveis de ambiente do .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # Em produção, variáveis já estarão no ambiente
+
+# Configuração do banco de dados MySQL a partir de variáveis de ambiente
+usuario = os.getenv("DB_USER", "u441041902_exportv")
+senha = quote_plus(os.getenv("DB_PASSWORD", "Mito010894@@"))  # Codificar caracteres especiais
+host = os.getenv("DB_HOST", "193.203.175.53")
+banco = os.getenv("DB_NAME", "u441041902_exportv")
+porta = int(os.getenv("DB_PORT", "3306"))
 
 DATABASE_URL = f"mysql+pymysql://{usuario}:{senha}@{host}:{porta}/{banco}"
 

@@ -14,6 +14,8 @@ class User(SQLModel, table=True):
     telefone: Optional[str] = None
     foto_url: Optional[str] = None
     limite_avisos: int = Field(default=10)  # Quantidade de avisos permitidos para o síndico
+    reset_token: Optional[str] = None  # Token para recuperação de senha
+    reset_token_expires: Optional[datetime] = None  # Expiração do token de recuperação
     condominios: List["Condominio"] = Relationship(back_populates="sindico")
 
 class Condominio(SQLModel, table=True):
