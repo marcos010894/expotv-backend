@@ -183,20 +183,29 @@ async def create_aviso(
         if not sindico:
             continue
             
-        # Contar apenas avisos ATIVOS do síndico
+        # Contar apenas avisos ATIVOS do síndico (case-insensitive)
         avisos_do_sindico = []
         avisos_ativos = session.exec(
-            select(Aviso).where(Aviso.status == "Ativo")
+            select(Aviso).where(Aviso.status.ilike("Ativo"))  # Case-insensitive
         ).all()
+        
+        print(f"🔍 DEBUG - Síndico ID {sindico_id} ({sindico.nome}):")
+        print(f"   Total de avisos ativos no sistema: {len(avisos_ativos)}")
         
         for aviso in avisos_ativos:
             aviso_cond_ids = [int(id.strip()) for id in aviso.condominios_ids.split(",") if id.strip()]
+            print(f"   Aviso #{aviso.id}: condominios_ids = {aviso_cond_ids}, status = {aviso.status}")
+            
             # Verificar se algum condomínio do aviso pertence ao síndico
             for cond_id in aviso_cond_ids:
                 cond = session.get(Condominio, cond_id)
                 if cond and cond.sindico_id == sindico_id:
                     avisos_do_sindico.append(aviso)
+                    print(f"      ✓ Condomínio {cond_id} pertence ao síndico!")
                     break
+        
+        print(f"   Total de avisos do síndico: {len(avisos_do_sindico)}")
+        print(f"   Limite permitido: {sindico.limite_avisos}")
         
         # Verificar se excede o limite
         if len(avisos_do_sindico) >= sindico.limite_avisos:
