@@ -183,11 +183,13 @@ async def create_aviso(
         if not sindico:
             continue
             
-        # Contar avisos ativos do síndico
+        # Contar apenas avisos ATIVOS do síndico
         avisos_do_sindico = []
-        todos_avisos = session.exec(select(Aviso)).all()
+        avisos_ativos = session.exec(
+            select(Aviso).where(Aviso.status == "Ativo")
+        ).all()
         
-        for aviso in todos_avisos:
+        for aviso in avisos_ativos:
             aviso_cond_ids = [int(id.strip()) for id in aviso.condominios_ids.split(",") if id.strip()]
             # Verificar se algum condomínio do aviso pertence ao síndico
             for cond_id in aviso_cond_ids:
