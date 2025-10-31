@@ -15,7 +15,7 @@ O sistema permite que o administrador configure individualmente cada TV para
 controlar a proporção de exibição de:
   1. Avisos
   2. Anúncios  
-  3. Notícias (apenas para Layout 2)
+  3. Notícias (Layout 1: rodapé/banner | Layout 2: tela cheia)
 
 ================================================================================
 MODELO DE DADOS
@@ -32,7 +32,9 @@ Novos campos adicionados:
     Quantidade de anúncios a exibir por ciclo
 
   • proporcao_noticias  (INT, padrão: 3)
-    Quantidade de notícias em tela cheia (apenas Layout 2)
+    Quantidade de notícias a exibir
+    Layout 1: Exibidas em rodapé/banner
+    Layout 2: Exibidas em tela cheia
 
 Configuração Padrão: 1:5:3 (1 aviso : 5 anúncios : 3 notícias)
 
@@ -196,26 +198,31 @@ Ordem de exibição:
 
 Exemplo 3: Layout 2 com Notícias (1:5:3)
 ------------------------------------------
-⚠️ IMPORTANTE: No Layout 2, notícias NÃO são retornadas pelo endpoint /content
-   Elas devem ser buscadas separadamente via /app/news ou /app/jovempan
+Ordem de exibição:
+  1. Aviso #1
+  2. Anúncio #1
+  3. Anúncio #2
+  4. Anúncio #3
+  5. Anúncio #4
+  6. Anúncio #5
+  ... (continua intercalando avisos e anúncios)
+  N-2. Notícia #1 (tela cheia)
+  N-1. Notícia #2 (tela cheia)
+  N. Notícia #3 (tela cheia)
 
-Ordem de exibição NO APP:
-  1. Buscar conteúdo intercalado: GET /app/tv/{codigo}/content
-     → Retorna apenas avisos e anúncios intercalados
-  
-  2. Exibir avisos e anúncios com transições normais
-  
-  3. Buscar notícias: GET /app/jovempan ou GET /app/news
-     → Retorna as notícias para exibição em tela cheia
-  
-  4. Exibir 3 notícias em tela cheia
-  
-  5. Voltar ao passo 1 (loop)
 
-IMPORTANTE: 
-- Layout 2: Notícias são exibidas em TELA CHEIA separadamente
-- Endpoint /content retorna APENAS avisos e anúncios intercalados
-- TV deve gerenciar alternância entre conteúdo e notícias
+Exemplo 4: Layout 1 com Notícias (1:5:3)
+------------------------------------------
+Ordem de exibição:
+  1. Aviso #1 (notícias no rodapé)
+  2. Anúncio #1 (notícias no rodapé)
+  3. Anúncio #2 (notícias no rodapé)
+  4. Anúncio #3 (notícias no rodapé)
+  5. Anúncio #4 (notícias no rodapé)
+  6. Anúncio #5 (notícias no rodapé)
+  ... (as 3 notícias ficam alternando no rodapé durante toda exibição)
+
+IMPORTANTE: Notícias são retornadas para AMBOS os layouts, mas exibidas de forma diferente
 
 ================================================================================
 CASOS DE USO
@@ -414,8 +421,9 @@ VALIDAÇÕES
 ✅ Proporção mínima: 0 (pode desabilitar avisos, anúncios ou notícias)
 ✅ Proporção máxima: Ilimitada
 ✅ Valores devem ser inteiros positivos
-✅ Layout 1: Notícias são intercaladas junto com avisos e anúncios
-✅ Layout 2: Notícias NÃO são retornadas (devem ser buscadas separadamente)
+✅ Notícias são retornadas para ambos layouts (1 e 2)
+✅ Layout 1: Notícias exibidas em rodapé/banner
+✅ Layout 2: Notícias exibidas em tela cheia
 ✅ Se não houver conteúdo suficiente, ciclo termina antes
 ✅ Content vazio retorna array vazio (não dá erro)
 

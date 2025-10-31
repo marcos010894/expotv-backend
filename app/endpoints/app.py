@@ -589,41 +589,39 @@ def get_tv_intercalated_content(
     2. Obtém as configurações de proporção (avisos:anúncios:notícias)
     3. Busca avisos e anúncios do condomínio da TV
     4. Intercala o conteúdo na proporção configurada
-    5. **Layout 1**: Adiciona notícias intercaladas
-    6. **Layout 2**: NÃO retorna notícias (são exibidas em tela cheia separadamente via /app/news ou /app/jovempan)
+    5. Adiciona notícias no final (se configurado)
     
-    **Exemplo de proporção 1:5:3 (Layout 1):**
+    **Layout 1**: Notícias são exibidas em rodapé/banner
+    **Layout 2**: Notícias são exibidas em tela cheia
+    
+    **Exemplo de proporção 1:5:3:**
     - 1 aviso
     - 5 anúncios
     - 1 aviso
     - 5 anúncios
     - ... (repete)
-    - 3 notícias intercaladas
-    
-    **Layout 2:**
-    - Retorna apenas avisos e anúncios intercalados
-    - Notícias são buscadas separadamente em tela cheia
+    - 3 notícias (no final)
     
     **Resposta:**
     ```json
     {
-        "content": [...],  // Lista intercalada de avisos e anúncios (+ notícias apenas se Layout 1)
+        "content": [...],  // Lista intercalada de avisos, anúncios e notícias
         "config": {
             "proporcao_avisos": 1,
             "proporcao_anuncios": 5,
-            "proporcao_noticias": 3  // 0 se Layout 2
+            "proporcao_noticias": 3
         },
         "stats": {
             "total_items": 15,
             "avisos": 5,
             "anuncios": 7,
-            "noticias": 3  // 0 se Layout 2
+            "noticias": 3
         }
     }
     ```
     
     Cada item retornado tem:
-    - **type**: "aviso", "anuncio" ou "noticia" (apenas Layout 1)
+    - **type**: "aviso", "anuncio" ou "noticia"
     - **data**: Objeto com os dados do conteúdo
     """
     
@@ -662,10 +660,11 @@ def get_tv_intercalated_content(
         if tv.condominio_id in cond_ids:
             anuncios.append(anuncio)
     
-    # 4. Buscar notícias (APENAS se NÃO for layout 2)
-    # No layout 2, notícias são exibidas em tela cheia separadamente
+    # 4. Buscar notícias (se proporção configurada)
+    # Layout 1: Exibe em rodapé/banner
+    # Layout 2: Exibe em tela cheia
     noticias = []
-    if tv.template != "layout2" and tv.proporcao_noticias > 0:
+    if tv.proporcao_noticias > 0:
         noticias = get_news(limit=tv.proporcao_noticias)
     
     # 5. Intercalar conteúdo
@@ -703,7 +702,9 @@ def get_tv_intercalated_content(
         if aviso_index >= len(avisos) and anuncio_index >= len(anuncios):
             break
     
-    # Adicionar notícias no final (APENAS se NÃO for layout 2)
+    # Adicionar notícias no final
+    # Layout 1: TV exibe em rodapé/banner
+    # Layout 2: TV exibe em tela cheia
     for noticia in noticias:
         content.append({
             "type": "noticia",
@@ -721,9 +722,8 @@ def get_tv_intercalated_content(
         "config": {
             "proporcao_avisos": tv.proporcao_avisos,
             "proporcao_anuncios": tv.proporcao_anuncios,
-            "proporcao_noticias": tv.proporcao_noticias if tv.template != "layout2" else 0,
-            "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s)" + 
-                        (f" : {tv.proporcao_noticias} notícia(s)" if tv.template != "layout2" else " (notícias em tela cheia separadamente)")
+            "proporcao_noticias": tv.proporcao_noticias,
+            "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s) : {tv.proporcao_noticias} notícia(s)"
         },
         "content": content,
         "stats": {
