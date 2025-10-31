@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
-from typing import List, Optional
+from typing import List, Optional, Union
 from app.db import engine
-from app.models import Anuncio, Aviso
+from app.models import Anuncio, Aviso, TV
 from pydantic import BaseModel
 import requests
 import logging
@@ -572,3 +572,158 @@ def get_jovempan_news(
             "source": "Jovem Pan",
             "error": str(e)
         }
+
+@router.get("/app/tv/{codigo_conexao}/content",
+    summary="📺 Conteúdo Intercalado por TV",
+    description="Retorna conteúdo (avisos, anúncios, notícias) intercalado de acordo com a proporção configurada da TV"
+)
+def get_tv_intercalated_content(
+    codigo_conexao: str,
+    session: Session = Depends(get_session)
+):
+    """
+    Retorna conteúdo intercalado baseado nas configurações da TV
+    
+    **Como funciona:**
+    1. Busca a TV pelo código de conexão
+    2. Obtém as configurações de proporção (avisos:anúncios:notícias)
+    3. Busca avisos e anúncios do condomínio da TV
+    4. Intercala o conteúdo na proporção configurada
+    5. Adiciona notícias se a TV usar layout 2
+    
+    **Exemplo de proporção 1:5:3:**
+    - 1 aviso
+    - 5 anúncios
+    - 1 aviso
+    - 5 anúncios
+    - ... (repete)
+    - 3 notícias (apenas layout 2)
+    
+    **Resposta:**
+    ```json
+    {
+        "content": [...],  // Lista intercalada de avisos, anúncios e notícias
+        "config": {
+            "proporcao_avisos": 1,
+            "proporcao_anuncios": 5,
+            "proporcao_noticias": 3
+        },
+        "stats": {
+            "total_items": 15,
+            "avisos": 5,
+            "anuncios": 7,
+            "noticias": 3
+        }
+    }
+    ```
+    
+    Cada item retornado tem:
+    - **type**: "aviso", "anuncio" ou "noticia"
+    - **data**: Objeto com os dados do conteúdo
+    """
+    
+    # 1. Buscar TV
+    tv = session.exec(select(TV).where(TV.codigo_conexao == codigo_conexao)).first()
+    if not tv:
+        raise HTTPException(status_code=404, detail="TV não encontrada com este código")
+    
+    # 2. Buscar avisos do condomínio
+    avisos_query = session.exec(
+        select(Aviso).where(
+            Aviso.status.ilike("Ativo"),
+            Aviso.condominios_ids.like(f"%{tv.condominio_id}%")
+        )
+    ).all()
+    
+    # Filtrar avisos que realmente contêm o condomínio
+    avisos = []
+    for aviso in avisos_query:
+        cond_ids = [int(id.strip()) for id in aviso.condominios_ids.split(",") if id.strip()]
+        if tv.condominio_id in cond_ids:
+            avisos.append(aviso)
+    
+    # 3. Buscar anúncios do condomínio
+    anuncios_query = session.exec(
+        select(Anuncio).where(
+            Anuncio.status == "Ativo",
+            Anuncio.condominios_ids.like(f"%{tv.condominio_id}%")
+        )
+    ).all()
+    
+    # Filtrar anúncios que realmente contêm o condomínio
+    anuncios = []
+    for anuncio in anuncios_query:
+        cond_ids = [int(id.strip()) for id in anuncio.condominios_ids.split(",") if id.strip()]
+        if tv.condominio_id in cond_ids:
+            anuncios.append(anuncio)
+    
+    # 4. Buscar notícias (se layout 2)
+    noticias = []
+    if tv.template == "layout2" and tv.proporcao_noticias > 0:
+        noticias = get_news(limit=tv.proporcao_noticias)
+    
+    # 5. Intercalar conteúdo
+    content = []
+    aviso_index = 0
+    anuncio_index = 0
+    
+    # Calcular quantos ciclos precisamos
+    total_cycles = max(
+        (len(avisos) // tv.proporcao_avisos) if tv.proporcao_avisos > 0 else 0,
+        (len(anuncios) // tv.proporcao_anuncios) if tv.proporcao_anuncios > 0 else 0,
+        1  # Pelo menos 1 ciclo
+    )
+    
+    for cycle in range(total_cycles + 1):
+        # Adicionar avisos conforme proporção
+        for _ in range(tv.proporcao_avisos):
+            if aviso_index < len(avisos):
+                content.append({
+                    "type": "aviso",
+                    "data": avisos[aviso_index]
+                })
+                aviso_index += 1
+        
+        # Adicionar anúncios conforme proporção
+        for _ in range(tv.proporcao_anuncios):
+            if anuncio_index < len(anuncios):
+                content.append({
+                    "type": "anuncio",
+                    "data": anuncios[anuncio_index]
+                })
+                anuncio_index += 1
+        
+        # Se não tem mais conteúdo, parar
+        if aviso_index >= len(avisos) and anuncio_index >= len(anuncios):
+            break
+    
+    # Adicionar notícias no final (layout 2)
+    for noticia in noticias:
+        content.append({
+            "type": "noticia",
+            "data": noticia
+        })
+    
+    return {
+        "success": True,
+        "tv": {
+            "id": tv.id,
+            "nome": tv.nome,
+            "codigo_conexao": tv.codigo_conexao,
+            "template": tv.template
+        },
+        "config": {
+            "proporcao_avisos": tv.proporcao_avisos,
+            "proporcao_anuncios": tv.proporcao_anuncios,
+            "proporcao_noticias": tv.proporcao_noticias,
+            "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s)" + 
+                        (f" : {tv.proporcao_noticias} notícia(s)" if tv.template == "layout2" else "")
+        },
+        "content": content,
+        "stats": {
+            "total_items": len(content),
+            "avisos": sum(1 for item in content if item["type"] == "aviso"),
+            "anuncios": sum(1 for item in content if item["type"] == "anuncio"),
+            "noticias": sum(1 for item in content if item["type"] == "noticia")
+        }
+    }

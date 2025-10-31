@@ -37,6 +37,12 @@ class TV(SQLModel, table=True):
     template: Optional[str] = None
     data_registro: datetime = Field(default_factory=datetime.utcnow)
     last_ping: Optional[datetime] = None  # Último ping recebido da TV
+    
+    # Configurações de proporção de exibição
+    proporcao_avisos: int = Field(default=1)  # Número de avisos a exibir
+    proporcao_anuncios: int = Field(default=5)  # Número de anúncios a exibir (proporção 1:5)
+    proporcao_noticias: int = Field(default=3)  # Número de notícias em tela cheia (layout 2)
+    
     condominio: Optional[Condominio] = Relationship(back_populates="tvs")
 
 class Anuncio(SQLModel, table=True):

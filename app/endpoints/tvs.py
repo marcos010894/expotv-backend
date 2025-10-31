@@ -4,6 +4,8 @@ from app.db import engine
 from app.models import TV
 from app.schemas import TVCreate
 from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
 import random
 
 router = APIRouter()
@@ -11,6 +13,12 @@ router = APIRouter()
 def get_session():
     with Session(engine) as session:
         yield session
+
+# Schema para configuração de proporções
+class TVConfigProporcao(BaseModel):
+    proporcao_avisos: Optional[int] = None
+    proporcao_anuncios: Optional[int] = None
+    proporcao_noticias: Optional[int] = None
 
 @router.get("/tvs", summary="Listar TVs", description="Lista todas as TVs do sistema")
 def get_all_tvs(session: Session = Depends(get_session)):
@@ -118,4 +126,93 @@ def get_tv_status(codigo_conexao: str, session: Session = Depends(get_session)):
         "status": tv.status,
         "last_ping": tv.last_ping,
         "nome": tv.nome
+    }
+
+@router.put("/tvs/{tv_id}/config", 
+    summary="⚙️ Configurar Proporções da TV", 
+    description="Atualiza as configurações de proporção de exibição de conteúdo (avisos, anúncios, notícias)")
+def update_tv_config(
+    tv_id: int, 
+    config: TVConfigProporcao, 
+    session: Session = Depends(get_session)
+):
+    """
+    Atualiza as configurações de proporção de exibição da TV
+    
+    **Proporção de Avisos:Anúncios:**
+    - Define quantos avisos e anúncios exibir em sequência
+    - Exemplo: 1:5 significa 1 aviso a cada 5 anúncios
+    - Padrão: 1:5
+    
+    **Proporção de Notícias (Layout 2):**
+    - Define quantas notícias em tela cheia exibir
+    - Usado apenas no layout 2
+    - Padrão: 3 notícias
+    
+    Exemplo:
+    ```json
+    {
+        "proporcao_avisos": 1,
+        "proporcao_anuncios": 5,
+        "proporcao_noticias": 3
+    }
+    ```
+    """
+    db_tv = session.get(TV, tv_id)
+    if not db_tv:
+        raise HTTPException(status_code=404, detail="TV não encontrada")
+    
+    # Atualizar apenas os campos fornecidos
+    if config.proporcao_avisos is not None:
+        if config.proporcao_avisos < 0:
+            raise HTTPException(status_code=400, detail="Proporção de avisos deve ser >= 0")
+        db_tv.proporcao_avisos = config.proporcao_avisos
+    
+    if config.proporcao_anuncios is not None:
+        if config.proporcao_anuncios < 0:
+            raise HTTPException(status_code=400, detail="Proporção de anúncios deve ser >= 0")
+        db_tv.proporcao_anuncios = config.proporcao_anuncios
+    
+    if config.proporcao_noticias is not None:
+        if config.proporcao_noticias < 0:
+            raise HTTPException(status_code=400, detail="Proporção de notícias deve ser >= 0")
+        db_tv.proporcao_noticias = config.proporcao_noticias
+    
+    session.add(db_tv)
+    session.commit()
+    session.refresh(db_tv)
+    
+    return {
+        "success": True,
+        "tv_id": db_tv.id,
+        "nome": db_tv.nome,
+        "config": {
+            "proporcao_avisos": db_tv.proporcao_avisos,
+            "proporcao_anuncios": db_tv.proporcao_anuncios,
+            "proporcao_noticias": db_tv.proporcao_noticias,
+            "descricao": f"{db_tv.proporcao_avisos} aviso(s) : {db_tv.proporcao_anuncios} anúncio(s) : {db_tv.proporcao_noticias} notícia(s)"
+        }
+    }
+
+@router.get("/tvs/{tv_id}/config",
+    summary="📋 Obter Configurações da TV",
+    description="Retorna as configurações de proporção de exibição da TV")
+def get_tv_config(tv_id: int, session: Session = Depends(get_session)):
+    """
+    Retorna as configurações de proporção de exibição da TV
+    """
+    db_tv = session.get(TV, tv_id)
+    if not db_tv:
+        raise HTTPException(status_code=404, detail="TV não encontrada")
+    
+    return {
+        "tv_id": db_tv.id,
+        "nome": db_tv.nome,
+        "codigo_conexao": db_tv.codigo_conexao,
+        "config": {
+            "proporcao_avisos": db_tv.proporcao_avisos,
+            "proporcao_anuncios": db_tv.proporcao_anuncios,
+            "proporcao_noticias": db_tv.proporcao_noticias,
+            "descricao": f"{db_tv.proporcao_avisos} aviso(s) : {db_tv.proporcao_anuncios} anúncio(s) : {db_tv.proporcao_noticias} notícia(s)"
+        }
     }
