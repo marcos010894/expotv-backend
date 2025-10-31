@@ -26,6 +26,58 @@ class NewsItem(BaseModel):
     publishedAt: str
     source: str
 
+def get_jovempan_news(limit: int = 10) -> List[NewsItem]:
+    """
+    Busca notícias APENAS da Jovem Pan
+    """
+    try:
+        from datetime import datetime
+        import re
+        
+        news_items = []
+        
+        # Buscar RSS da Jovem Pan (sem count, pega 10 por padrão)
+        response = requests.get(
+            'https://api.rss2json.com/v1/api.json',
+            params={'rss_url': 'https://jovempan.com.br/feed/'},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get('items', [])
+            
+            for item in items[:limit]:
+                # Limpar HTML da descrição
+                description = item.get('description', '')
+                description = re.sub('<[^<]+?>', '', description).strip()
+                
+                if len(description) > 200:
+                    description = description[:200] + "..."
+                
+                # Extrair imagem
+                thumbnail = item.get('thumbnail', '')
+                if not thumbnail and 'enclosure' in item:
+                    thumbnail = item.get('enclosure', {}).get('link', '')
+                
+                news_item = NewsItem(
+                    title=item.get('title', '').strip(),
+                    description=description,
+                    url=item.get('link', ''),
+                    urlToImage=thumbnail,
+                    publishedAt=item.get('pubDate', datetime.now().isoformat() + "Z"),
+                    source='🎙️ Jovem Pan'
+                )
+                
+                if news_item.title:
+                    news_items.append(news_item)
+        
+        return news_items
+        
+    except Exception as e:
+        logging.error(f"Erro ao buscar notícias da Jovem Pan: {e}")
+        return []
+
 class AppContent(BaseModel):
     anuncios: List[Anuncio] = []
     avisos: List[Aviso] = []
@@ -341,8 +393,8 @@ def get_app_content(
                 import re
                 
                 response = requests.get(
-                    'https://api.rss2json.com/v1/api.json?rss_url=https://jovempan.com.br/feed/',
-                    params={'count': news_limit * 2},
+                    'https://api.rss2json.com/v1/api.json',
+                    params={'rss_url': 'https://jovempan.com.br/feed/'},
                     timeout=10
                 )
                 
@@ -375,7 +427,7 @@ def get_app_content(
                 logging.error(f"Erro ao buscar Jovem Pan: {e}")
         else:
             # Buscar de múltiplas fontes (incluindo Jovem Pan)
-            news_items = get_news(limit=news_limit)
+            news_items = get_jovempan_news(limit=news_limit)
     
     return AppContent(
         anuncios=anuncios_filtrados,
@@ -447,18 +499,18 @@ def get_avisos_condominio(
     return {"avisos": avisos_filtrados, "total": len(avisos_filtrados)}
 
 @router.get("/app/news", 
-    summary="📰 Notícias", 
-    description="Retorna notícias de APIs externas",
-    response_description="Lista de notícias"
+    summary="📰 Notícias Jovem Pan", 
+    description="Retorna notícias da Jovem Pan",
+    response_description="Lista de notícias da Jovem Pan"
 )
 def get_news_endpoint(
     limit: int = Query(10, description="Número máximo de notícias", ge=1, le=50)
 ):
     """
-    Retorna notícias de APIs externas
+    Retorna notícias APENAS da Jovem Pan
     """
-    news_items = get_news(limit=limit)
-    return {"news": news_items, "total": len(news_items)}
+    news_items = get_jovempan_news(limit=limit)
+    return {"news": news_items, "total": len(news_items), "source": "🎙️ Jovem Pan"}
 
 @router.get("/app/status", 
     summary="📊 Status do Sistema", 
@@ -478,7 +530,7 @@ def get_app_status(session: Session = Depends(get_session)):
     news_available = True
     news_count = 0
     try:
-        news_items = get_news(limit=5)
+        news_items = get_jovempan_news(limit=5)
         news_count = len(news_items)
     except Exception as e:
         news_available = False
@@ -506,7 +558,7 @@ def get_app_status(session: Session = Depends(get_session)):
     description="Retorna notícias exclusivas da Jovem Pan",
     response_description="Lista de notícias da Jovem Pan"
 )
-def get_jovempan_news(
+def get_jovempan_endpoint(
     limit: int = Query(10, description="Número máximo de notícias", ge=1, le=50)
 ):
     """
@@ -522,8 +574,8 @@ def get_jovempan_news(
         
         # Buscar RSS da Jovem Pan
         response = requests.get(
-            'https://api.rss2json.com/v1/api.json?rss_url=https://jovempan.com.br/feed/',
-            params={'count': limit * 2},  # Buscar mais para ter margem
+            'https://api.rss2json.com/v1/api.json',
+            params={'rss_url': 'https://jovempan.com.br/feed/'},
             timeout=10
         )
         
@@ -663,9 +715,14 @@ def get_tv_intercalated_content(
     # 4. Buscar notícias (se proporção configurada)
     # Layout 1: Exibe em rodapé/banner
     # Layout 2: Exibe em tela cheia
+    # Usando APENAS notícias da Jovem Pan
     noticias = []
     if tv.proporcao_noticias > 0:
-        noticias = get_news(limit=tv.proporcao_noticias)
+        logging.info(f"TV {tv.nome}: Buscando {tv.proporcao_noticias} notícias da Jovem Pan")
+        noticias = get_jovempan_news(limit=tv.proporcao_noticias)
+        logging.info(f"TV {tv.nome}: {len(noticias)} notícias encontradas da Jovem Pan")
+    else:
+        logging.info(f"TV {tv.nome}: proporcao_noticias = 0, pulando busca de notícias")
     
     # 5. Intercalar conteúdo
     content = []

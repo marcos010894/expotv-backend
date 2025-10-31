@@ -270,7 +270,7 @@ Notícias esportivas
   "proporcao_anuncios": 1,
   "proporcao_noticias": 0
 }
-Resultado: Apenas anúncios
+Resultado: Apenas anúncios (sem avisos nem notícias)
 
 
 5. DESABILITAR ANÚNCIOS (SÓ AVISOS)
@@ -280,7 +280,18 @@ Resultado: Apenas anúncios
   "proporcao_anuncios": 0,
   "proporcao_noticias": 0
 }
-Resultado: Apenas avisos
+Resultado: Apenas avisos (sem anúncios nem notícias)
+
+
+6. DESABILITAR NOTÍCIAS (Layout 2)
+-------------------------------------
+{
+  "proporcao_avisos": 1,
+  "proporcao_anuncios": 5,
+  "proporcao_noticias": 0
+}
+Resultado: Apenas avisos e anúncios (sem notícias)
+⚠️ Útil para Layout 2 quando não quiser notícias em tela cheia
 
 ================================================================================
 IMPLEMENTAÇÃO NO FRONTEND (ADMIN)
@@ -420,10 +431,11 @@ VALIDAÇÕES
 
 ✅ Proporção mínima: 0 (pode desabilitar avisos, anúncios ou notícias)
 ✅ Proporção máxima: Ilimitada
-✅ Valores devem ser inteiros positivos
+✅ Valores devem ser inteiros positivos ou zero
 ✅ Notícias são retornadas para ambos layouts (1 e 2)
 ✅ Layout 1: Notícias exibidas em rodapé/banner
 ✅ Layout 2: Notícias exibidas em tela cheia
+✅ Se proporcao_noticias == 0: NÃO retorna notícias (array vazio)
 ✅ Se não houver conteúdo suficiente, ciclo termina antes
 ✅ Content vazio retorna array vazio (não dá erro)
 
