@@ -52,8 +52,18 @@ def get_jovempan_news(limit: int = 15) -> List[NewsItem]:
                 if len(description) > 200:
                     description = description[:200] + "..."
                 
-                # Extrair imagem
+                # Extrair imagem (está no content como HTML)
                 thumbnail = item.get('thumbnail', '')
+                
+                # Se não tiver thumbnail, buscar no content
+                if not thumbnail:
+                    content = item.get('content', '')
+                    # Buscar tag img src no HTML
+                    img_match = re.search(r'<img[^>]+src="([^"]+)"', content)
+                    if img_match:
+                        thumbnail = img_match.group(1)
+                
+                # Tentar enclosure se ainda não tiver imagem
                 if not thumbnail and 'enclosure' in item:
                     thumbnail = item.get('enclosure', {}).get('link', '')
                 
