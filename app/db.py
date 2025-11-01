@@ -11,11 +11,11 @@ except ImportError:
     pass  # Em produção, variáveis já estarão no ambiente
 
 # Configuração do banco de dados MySQL a partir de variáveis de ambiente
-usuario = os.getenv("DB_USER", "u441041902_exportv")
-senha = quote_plus(os.getenv("DB_PASSWORD", "Mito010894@@"))  # Codificar caracteres especiais
-host = os.getenv("DB_HOST", "193.203.175.53")
-banco = os.getenv("DB_NAME", "u441041902_exportv")
-porta = int(os.getenv("DB_PORT", "3306"))
+usuario = os.getenv("DB_USER", "")
+senha = quote_plus(os.getenv("DB_PASSWORD", ""))  # Codificar caracteres especiais
+host = os.getenv("DB_HOST", "")
+banco = os.getenv("DB_NAME", "")
+porta = int(os.getenv("DB_PORT", ""))
 
 DATABASE_URL = f"mysql+pymysql://{usuario}:{senha}@{host}:{porta}/{banco}"
 

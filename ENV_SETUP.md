@@ -32,20 +32,17 @@
 ---
 
 ### 2. `.env.example` (Documentação)
-**Localização:** `/Users/marcospaulomachadoazevedo/Documents/EXPO-TV/BACKEND/.env.example`
 
-Arquivo de exemplo com instruções para outros desenvolvedores.
+Arquivo de exemplo com instruções.
 
 ---
 
 ### 3. `test_email.py` (Script de Teste)
-**Localização:** `/Users/marcospaulomachadoazevedo/Documents/EXPO-TV/BACKEND/test_email.py`
-
 Script para testar envio de emails.
 
 **Como usar:**
 ```bash
-python test_email.py
+python tests/test_email.py
 ```
 
 Solicita um email de destino e envia 2 emails de teste:
