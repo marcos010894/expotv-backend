@@ -85,6 +85,11 @@ def get_jovempan_news(limit: int = 15) -> List[NewsItem]:
         logging.error(f"Erro ao buscar notícias da Jovem Pan: {e}")
         return []
 
+class ContentItem(BaseModel):
+    """Item de conteúdo unificado (pode ser aviso, anúncio ou notícia)"""
+    type: str  # "aviso", "anuncio", "noticia"
+    data: Union[Aviso, Anuncio, NewsItem]
+
 class AppContent(BaseModel):
     anuncios: List[Anuncio] = []
     avisos: List[Aviso] = []
@@ -93,17 +98,28 @@ class AppContent(BaseModel):
     total_avisos: int = 0
     total_news: int = 0
 
+class AppContentIntercalado(BaseModel):
+    """Conteúdo intercalado respeitando proporções da TV"""
+    content: List[dict] = []
+    total_items: int = 0
+    proporcao_avisos: int = 1
+    proporcao_anuncios: int = 5
+    proporcao_noticias: int = 3
+
 @router.get("/app/content/{condominio_id}", 
     summary="📱 Conteúdo do App", 
     description="Retorna todos os anúncios, avisos e notícias para um condomínio específico",
-    response_description="Anúncios, avisos e notícias do condomínio",
-    response_model=AppContent
+    response_description="Anúncios, avisos e notícias do condomínio"
 )
 def get_app_content(
     condominio_id: int,
     status: Optional[str] = Query("Ativo", description="Status dos conteúdos (padrão: Ativo)"),
     include_news: bool = Query(True, description="Incluir notícias da Jovem Pan"),
     news_limit: int = Query(15, description="Número máximo de notícias (padrão: 15)"),
+    intercalado: bool = Query(False, description="Retornar conteúdo intercalado (padrão: False)"),
+    proporcao_avisos: int = Query(1, description="Proporção de avisos (padrão: 1)"),
+    proporcao_anuncios: int = Query(5, description="Proporção de anúncios (padrão: 5)"),
+    proporcao_noticias: int = Query(3, description="Proporção de notícias (padrão: 3)"),
     session: Session = Depends(get_session)
 ):
     """
@@ -113,6 +129,10 @@ def get_app_content(
     - **status**: Status dos conteúdos (padrão: Ativo)
     - **include_news**: Se deve incluir notícias da Jovem Pan 🎙️
     - **news_limit**: Número máximo de notícias (padrão: 15)
+    - **intercalado**: Se True, retorna conteúdo intercalado respeitando proporções (padrão: False)
+    - **proporcao_avisos**: Proporção de avisos no intercalamento (padrão: 1)
+    - **proporcao_anuncios**: Proporção de anúncios no intercalamento (padrão: 5)
+    - **proporcao_noticias**: Proporção de notícias no intercalamento (padrão: 3)
     
     Busca anúncios e avisos onde o condomínio está na lista de condomínios_ids
     Também busca notícias da Jovem Pan
@@ -155,6 +175,87 @@ def get_app_content(
     if include_news:
         news_items = get_jovempan_news(limit=news_limit)
     
+    # Se intercalado=True, retornar conteúdo misturado em ROUND-ROBIN
+    if intercalado:
+        content_intercalado = []
+        
+        # Índices para controlar posição em cada lista
+        idx_avisos = 0
+        idx_anuncios = 0
+        idx_noticias = 0
+        
+        # ROUND-ROBIN: Continuar enquanto houver conteúdo em qualquer lista
+        while idx_avisos < len(avisos_filtrados) or idx_anuncios < len(anuncios_filtrados) or idx_noticias < len(news_items):
+            # 1. Adicionar X avisos SEGUIDOS (conforme proporção)
+            for _ in range(proporcao_avisos):
+                if idx_avisos < len(avisos_filtrados):
+                    aviso = avisos_filtrados[idx_avisos]
+                    content_intercalado.append({
+                        "type": "aviso",
+                        "id": aviso.id,
+                        "nome": aviso.nome,
+                        "descricao": aviso.descricao,
+                        "imagem_url": aviso.imagem_url,
+                        "video_url": aviso.video_url,
+                        "data_criacao": aviso.data_criacao.isoformat() if aviso.data_criacao else None,
+                        "data_expiracao": aviso.data_expiracao.isoformat() if aviso.data_expiracao else None,
+                        "status": aviso.status
+                    })
+                    idx_avisos += 1
+                else:
+                    break  # Para de tentar adicionar avisos se acabaram
+            
+            # 2. Adicionar X anúncios SEGUIDOS (conforme proporção)
+            for _ in range(proporcao_anuncios):
+                if idx_anuncios < len(anuncios_filtrados):
+                    anuncio = anuncios_filtrados[idx_anuncios]
+                    content_intercalado.append({
+                        "type": "anuncio",
+                        "id": anuncio.id,
+                        "nome": anuncio.nome,
+                        "descricao": anuncio.descricao,
+                        "imagem_url": anuncio.imagem_url,
+                        "video_url": anuncio.video_url,
+                        "tempo_exibicao": anuncio.tempo_exibicao,
+                        "data_criacao": anuncio.data_criacao.isoformat() if anuncio.data_criacao else None,
+                        "data_expiracao": anuncio.data_expiracao.isoformat() if anuncio.data_expiracao else None,
+                        "status": anuncio.status
+                    })
+                    idx_anuncios += 1
+                else:
+                    break  # Para de tentar adicionar anúncios se acabaram
+            
+            # 3. Adicionar X notícias SEGUIDAS (conforme proporção)
+            for _ in range(proporcao_noticias):
+                if idx_noticias < len(news_items):
+                    noticia = news_items[idx_noticias]
+                    content_intercalado.append({
+                        "type": "noticia",
+                        "title": noticia.title,
+                        "description": noticia.description,
+                        "url": noticia.url,
+                        "urlToImage": noticia.urlToImage,
+                        "publishedAt": noticia.publishedAt,
+                        "source": noticia.source
+                    })
+                    idx_noticias += 1
+                else:
+                    break  # Para de tentar adicionar notícias se acabaram
+            
+            # Volta pro início do ciclo (próxima rodada)
+        
+        return {
+            "content": content_intercalado,
+            "total_items": len(content_intercalado),
+            "proporcao_avisos": proporcao_avisos,
+            "proporcao_anuncios": proporcao_anuncios,
+            "proporcao_noticias": proporcao_noticias,
+            "total_avisos": len(avisos_filtrados),
+            "total_anuncios": len(anuncios_filtrados),
+            "total_news": len(news_items)
+        }
+    
+    # Retorno padrão (separado por tipo)
     return AppContent(
         anuncios=anuncios_filtrados,
         avisos=avisos_filtrados,
