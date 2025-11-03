@@ -16,6 +16,7 @@ Sistema de gerenciamento de conteúdo para TVs corporativas com suporte a avisos
 
 - Python 3.13 ou superior
 - MySQL 8.0 ou superior
+- FFmpeg (para conversão automática de vídeos)
 - Git
 
 ## Instalação
@@ -27,7 +28,35 @@ git clone .EsteREPO
 cd expotv-backend
 ```
 
-### 2. Crie e ative o ambiente virtual
+### 2. Instale o FFmpeg
+
+O sistema converte automaticamente todos os vídeos para MP4 antes de salvar.
+
+**macOS:**
+```bash
+brew install ffmpeg
+# ou execute o script
+./install-ffmpeg.sh
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y ffmpeg
+# ou execute o script
+./install-ffmpeg.sh
+```
+
+**Windows:**
+- Baixe de: https://ffmpeg.org/download.html
+- Adicione ao PATH do sistema
+
+Verifique a instalação:
+```bash
+ffmpeg -version
+```
+
+### 3. Crie e ative o ambiente virtual
 
 **macOS/Linux:**
 ```bash
@@ -41,13 +70,13 @@ python -m venv .venv
 .venv\Scripts\activate
 ```
 
-### 3. Instale as dependências
+### 4. Instale as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure as variáveis de ambiente
+### 5. Configure as variáveis de ambiente
 
 Copie o arquivo de exemplo e configure suas credenciais:
 
