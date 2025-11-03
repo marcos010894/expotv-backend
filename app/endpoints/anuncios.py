@@ -62,7 +62,15 @@ async def create_anuncio(
         # Validar tipo de arquivo (imagem ou vídeo)
         allowed_types = [
             'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
-            'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg'
+            'video/mp4', 
+            'video/quicktime', 
+            'video/x-msvideo',  # AVI padrão
+            'video/msvideo',     # AVI alternativo
+            'video/avi',         # AVI alternativo 2
+            'application/x-troff-msvideo',  # AVI antigo
+            'video/webm', 
+            'video/mpeg',
+            'video/x-matroska'   # MKV (bonus)
         ]
         
         if image.content_type not in allowed_types:

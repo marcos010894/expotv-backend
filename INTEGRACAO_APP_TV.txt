@@ -1,0 +1,399 @@
+================================================================================
+  INTEGRAÇÃO DO APLICATIVO TV COM API - SISTEMA DE INTERCALAÇÃO
+================================================================================
+
+📅 Atualizado em: 02/11/2025
+🔗 API Base URL: https://expotv-backend.fly.dev
+📺 Sistema: EXPO TV - Gestão de Conteúdo para Condomínios
+
+================================================================================
+  1. ENDPOINT PRINCIPAL PARA TVs
+================================================================================
+
+GET /app/tv/{codigo_conexao}/content
+
+DESCRIÇÃO:
+  Retorna todo o conteúdo (avisos, anúncios e notícias) já INTERCALADO
+  na ordem correta de exibição, respeitando as proporções configuradas
+  no painel administrativo para cada TV.
+
+PARÂMETROS:
+  - codigo_conexao: Código único da TV (fornecido no cadastro)
+
+EXEMPLO DE REQUISIÇÃO:
+  GET https://expotv-backend.fly.dev/app/tv/ABC123XYZ/content
+
+RESPOSTA (JSON):
+{
+  "success": true,
+  "tv": {
+    "id": 5,
+    "nome": "TV Lobby Principal",
+    "codigo_conexao": "ABC123XYZ",
+    "template": "Layout 1"
+  },
+  "config": {
+    "proporcao_avisos": 1,
+    "proporcao_anuncios": 5,
+    "proporcao_noticias": 3,
+    "descricao": "1 aviso(s) : 5 anúncio(s) : 3 notícia(s)"
+  },
+  "content": [
+    {
+      "type": "aviso",
+      "data": {
+        "id": 10,
+        "nome": "Manutenção Elevador",
+        "descricao": "Elevador em manutenção hoje",
+        "imagem_url": "https://...",
+        "video_url": null,
+        "status": "Ativo"
+      }
+    },
+    {
+      "type": "anuncio",
+      "data": {
+        "id": 25,
+        "nome": "Promoção Mercado",
+        "descricao": "50% OFF em frutas",
+        "imagem_url": "https://...",
+        "video_url": null,
+        "tempo_exibicao": 10,
+        "status": "Ativo"
+      }
+    },
+    {
+      "type": "anuncio",
+      "data": {
+        "id": 26,
+        "nome": "Academia Local",
+        "descricao": "Matricula grátis",
+        "imagem_url": "https://...",
+        "tempo_exibicao": 15
+      }
+    },
+    ... (mais 3 anúncios seguidos)
+    {
+      "type": "noticia",
+      "data": {
+        "title": "Economia cresce 2% no trimestre",
+        "description": "Segundo dados do IBGE...",
+        "url": "https://jovempan.com.br/...",
+        "urlToImage": "https://jpimg.com.br/...",
+        "publishedAt": "2025-11-02T10:30:00Z",
+        "source": "🎙️ Jovem Pan"
+      }
+    },
+    ... (mais 2 notícias seguidas)
+  ],
+  "stats": {
+    "total_items": 45,
+    "avisos": 5,
+    "anuncios": 25,
+    "noticias": 15
+  }
+}
+
+================================================================================
+  2. COMO FUNCIONA A INTERCALAÇÃO (ROUND-ROBIN)
+================================================================================
+
+A PROPORÇÃO define QUANTOS ITENS SEGUIDOS de cada tipo aparecem por RODADA.
+
+EXEMPLO: Config "1:5:3" significa:
+
+  RODADA 1:
+    ├─ Exibir 1 AVISO
+    ├─ Exibir 1 ANÚNCIO
+    ├─ Exibir 1 ANÚNCIO
+    ├─ Exibir 1 ANÚNCIO
+    ├─ Exibir 1 ANÚNCIO
+    ├─ Exibir 1 ANÚNCIO (5 anúncios seguidos!)
+    ├─ Exibir 1 NOTÍCIA
+    ├─ Exibir 1 NOTÍCIA
+    └─ Exibir 1 NOTÍCIA (3 notícias seguidas!)
+
+  RODADA 2:
+    ├─ Exibir 1 AVISO
+    ├─ 5 ANÚNCIOS seguidos...
+    └─ 3 NOTÍCIAS seguidas...
+
+  ... REPETE até acabar o conteúdo disponível
+
+
+OUTRO EXEMPLO: Config "1:2:1"
+
+  RODADA 1:
+    ├─ 1 AVISO
+    ├─ 1 ANÚNCIO
+    ├─ 1 ANÚNCIO (2 seguidos!)
+    └─ 1 NOTÍCIA
+
+  RODADA 2:
+    ├─ 1 AVISO
+    ├─ 2 ANÚNCIOS
+    └─ 1 NOTÍCIA
+
+  ... REPETE
+
+
+EXEMPLO EXTREMO: Config "0:1:0" (apenas anúncios)
+
+  RODADA 1:
+    └─ 1 ANÚNCIO
+  
+  RODADA 2:
+    └─ 1 ANÚNCIO
+  
+  ... REPETE
+
+
+================================================================================
+  3. LÓGICA DE EXIBIÇÃO NO APLICATIVO
+================================================================================
+
+PSEUDOCÓDIGO:
+
+  1. Fazer requisição GET /app/tv/{codigo}/content
+  2. Guardar o array "content" retornado
+  3. Para cada item no array "content":
+     
+     a) Verificar o campo "type":
+        - Se type == "aviso":
+            * Exibir item.data.imagem_url (se tiver)
+            * OU exibir item.data.video_url (se tiver)
+            * Duração: 10 segundos (padrão para avisos)
+        
+        - Se type == "anuncio":
+            * Exibir item.data.imagem_url (se tiver)
+            * OU exibir item.data.video_url (se tiver)
+            * Duração: item.data.tempo_exibicao segundos
+        
+        - Se type == "noticia":
+            * Layout 1: Exibir no rodapé/banner inferior
+            * Layout 2: Exibir em tela cheia
+            * Usar item.data.title, description, urlToImage
+            * Duração: 15 segundos (padrão para notícias)
+     
+     b) Aguardar o tempo de exibição
+     c) Passar para o próximo item
+  
+  4. Quando terminar o array, VOLTAR ao início (loop infinito)
+  5. A cada X minutos (sugestão: 5 min), refazer requisição para atualizar conteúdo
+
+
+EXEMPLO EM CÓDIGO (JavaScript/TypeScript):
+
+```javascript
+async function carregarConteudo() {
+  const response = await fetch(
+    'https://expotv-backend.fly.dev/app/tv/ABC123XYZ/content'
+  );
+  const data = await response.json();
+  return data.content; // Array de itens intercalados
+}
+
+async function exibirConteudo() {
+  const content = await carregarConteudo();
+  let index = 0;
+
+  while (true) {
+    const item = content[index];
+    
+    if (item.type === 'aviso') {
+      // Exibir aviso
+      if (item.data.video_url) {
+        await exibirVideo(item.data.video_url, 10);
+      } else if (item.data.imagem_url) {
+        await exibirImagem(item.data.imagem_url, 10);
+      }
+    } 
+    else if (item.type === 'anuncio') {
+      // Exibir anúncio
+      const duracao = item.data.tempo_exibicao || 10;
+      if (item.data.video_url) {
+        await exibirVideo(item.data.video_url, duracao);
+      } else if (item.data.imagem_url) {
+        await exibirImagem(item.data.imagem_url, duracao);
+      }
+    }
+    else if (item.type === 'noticia') {
+      // Exibir notícia
+      await exibirNoticia({
+        titulo: item.data.title,
+        descricao: item.data.description,
+        imagem: item.data.urlToImage
+      }, 15);
+    }
+    
+    // Próximo item
+    index++;
+    if (index >= content.length) {
+      index = 0; // Volta pro início
+      // Opcional: Recarregar conteúdo
+      content = await carregarConteudo();
+    }
+  }
+}
+```
+
+
+================================================================================
+  4. TIPOS DE LAYOUT
+================================================================================
+
+A TV tem um campo "template" que define como exibir:
+
+LAYOUT 1 (Rodapé):
+  - Avisos: Tela cheia
+  - Anúncios: Tela cheia
+  - Notícias: Banner no rodapé (texto correndo) enquanto exibe avisos/anúncios
+
+LAYOUT 2 (Tela Cheia):
+  - Avisos: Tela cheia
+  - Anúncios: Tela cheia
+  - Notícias: Tela cheia (intercaladas normalmente)
+
+
+================================================================================
+  5. CAMPOS IMPORTANTES
+================================================================================
+
+AVISOS:
+  - id: Identificador único
+  - nome: Título do aviso
+  - descricao: Texto descritivo
+  - imagem_url: URL da imagem (pode ser null)
+  - video_url: URL do vídeo (pode ser null)
+  - status: "Ativo" ou "Inativo"
+  - data_expiracao: Data/hora de expiração (pode ser null)
+
+ANÚNCIOS:
+  - id: Identificador único
+  - nome: Título do anúncio
+  - descricao: Texto descritivo
+  - imagem_url: URL da imagem (pode ser null)
+  - video_url: URL do vídeo (pode ser null)
+  - tempo_exibicao: Segundos para exibir (ex: 10, 15, 30)
+  - status: "Ativo" ou "Inativo"
+  - data_expiracao: Data/hora de expiração (pode ser null)
+
+NOTÍCIAS (sempre da Jovem Pan 🎙️):
+  - title: Título da notícia
+  - description: Resumo (max 200 caracteres)
+  - url: Link para matéria completa
+  - urlToImage: URL da imagem de capa
+  - publishedAt: Data/hora de publicação (ISO 8601)
+  - source: Sempre "🎙️ Jovem Pan"
+
+
+================================================================================
+  6. TRATAMENTO DE ERROS
+================================================================================
+
+SE A TV NÃO FOR ENCONTRADA:
+{
+  "detail": "TV não encontrada com este código"
+}
+Status: 404
+
+SE NÃO HOUVER CONTEÚDO:
+{
+  "success": true,
+  "content": [],
+  "stats": {
+    "total_items": 0,
+    "avisos": 0,
+    "anuncios": 0,
+    "noticias": 0
+  }
+}
+Status: 200
+
+RECOMENDAÇÃO:
+  - Se content[] estiver vazio, exibir tela de "Aguardando conteúdo"
+  - Tentar novamente após 1 minuto
+
+
+================================================================================
+  7. OTIMIZAÇÕES E BOAS PRÁTICAS
+================================================================================
+
+1. CACHE LOCAL:
+   - Guardar o conteúdo em memória
+   - Atualizar a cada 5 minutos (ou menos se necessário)
+
+2. PRÉ-CARREGAMENTO:
+   - Baixar imagens/vídeos com antecedência
+   - Evitar travamentos durante exibição
+
+3. TRATAMENTO DE MÍDIA:
+   - Verificar se imagem_url ou video_url existem antes de exibir
+   - Ter imagem/vídeo de fallback para casos de erro
+
+4. TRANSIÇÕES:
+   - Usar fade in/out entre conteúdos
+   - Evitar cortes bruscos
+
+5. LOG DE EXIBIÇÃO:
+   - Registrar qual conteúdo foi exibido e quando
+   - Útil para relatórios de audiência
+
+
+================================================================================
+  8. ENDPOINT ALTERNATIVO (MODO LEGADO)
+================================================================================
+
+Se por algum motivo precisar buscar conteúdo SEM intercalação:
+
+GET /app/content/{condominio_id}
+
+Retorna conteúdo separado por tipo:
+{
+  "anuncios": [...],
+  "avisos": [...],
+  "news": [...],
+  "total_anuncios": 10,
+  "total_avisos": 5,
+  "total_news": 15
+}
+
+Com parâmetro ?intercalado=true, retorna intercalado:
+
+GET /app/content/123?intercalado=true&proporcao_avisos=1&proporcao_anuncios=5&proporcao_noticias=3
+
+
+================================================================================
+  9. RESUMO - CHECKLIST DE IMPLEMENTAÇÃO
+================================================================================
+
+☐ 1. Implementar requisição GET /app/tv/{codigo}/content
+☐ 2. Parsear resposta JSON
+☐ 3. Iterar sobre array "content"
+☐ 4. Para cada item, verificar "type" (aviso/anuncio/noticia)
+☐ 5. Exibir mídia (imagem ou vídeo) conforme tipo
+☐ 6. Respeitar tempo de exibição:
+     - Avisos: 10s (padrão)
+     - Anúncios: usar campo "tempo_exibicao"
+     - Notícias: 15s (padrão)
+☐ 7. Implementar loop infinito (volta ao início quando terminar)
+☐ 8. Implementar atualização periódica (a cada 5 min)
+☐ 9. Tratar casos de erro (sem conteúdo, rede offline, etc)
+☐ 10. Implementar pre-load de mídias
+☐ 11. Adicionar transições suaves
+
+
+================================================================================
+  10. SUPORTE E DÚVIDAS
+================================================================================
+
+Backend:    https://expotv-backend.fly.dev
+Docs API:   https://expotv-backend.fly.dev/docs
+Frontend:   https://expotv.com.br
+
+Para dúvidas sobre a integração, consulte a documentação interativa da API
+acessando /docs no endpoint do backend.
+
+================================================================================
+  FIM DO DOCUMENTO
+================================================================================

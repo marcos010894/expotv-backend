@@ -219,7 +219,17 @@ async def create_aviso(
     if media and media.filename:
         # Tipos de mídia permitidos
         allowed_image_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
-        allowed_video_types = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/mpeg']
+        allowed_video_types = [
+            'video/mp4', 
+            'video/quicktime', 
+            'video/x-msvideo',  # AVI padrão
+            'video/msvideo',     # AVI alternativo
+            'video/avi',         # AVI alternativo 2
+            'application/x-troff-msvideo',  # AVI antigo
+            'video/webm', 
+            'video/mpeg',
+            'video/x-matroska'   # MKV (bonus)
+        ]
         allowed_types = allowed_image_types + allowed_video_types
         
         if media.content_type not in allowed_types:
