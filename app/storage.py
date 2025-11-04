@@ -134,9 +134,9 @@ def upload_image_to_r2(file_content: bytes, filename: str, content_type: str) ->
     try:
         # Se for vídeo e NÃO for MP4, converter
         is_video = content_type.startswith('video/')
-        is_mp4 = content_type == 'video/mp4'
+        is_compatible = content_type in ['video/mp4', 'video/quicktime']
         
-        if is_video and not is_mp4:
+        if is_video and not is_compatible:
             print(f"🎬 Convertendo vídeo {filename} para MP4...")
             file_content, content_type = convert_video_to_mp4(file_content, filename)
             # Trocar extensão para .mp4
@@ -180,9 +180,9 @@ def upload_media_to_r2(file_content: bytes, filename: str, content_type: str, me
     try:
         # Se for vídeo e NÃO for MP4, converter
         is_video = content_type.startswith('video/')
-        is_mp4 = content_type == 'video/mp4'
+        is_compatible = content_type in ['video/mp4', 'video/quicktime']
         
-        if is_video and not is_mp4:
+        if is_video and not is_compatible:
             print(f"🎬 Convertendo vídeo {filename} para MP4...")
             file_content, content_type = convert_video_to_mp4(file_content, filename)
             # Trocar extensão para .mp4
