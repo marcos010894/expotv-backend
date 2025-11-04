@@ -63,14 +63,14 @@ def convert_video_to_mp4(input_content: bytes, input_filename: str) -> tuple[byt
         
         temp_output_path = temp_input_path.replace(input_ext, '.mp4')
         
-        # Converter usando FFmpeg com configurações otimizadas
+        # Converter usando FFmpeg com configurações otimizadas e simples
         # -y: sobrescrever sem perguntar
         # -i: arquivo de entrada
         # -c:v libx264: codec de vídeo H.264
         # -preset fast: velocidade de conversão
         # -crf 23: qualidade (18-28, menor = melhor)
-        # -c:a aac: codec de áudio
-        # -b:a 128k: bitrate do áudio
+        # -pix_fmt yuv420p: compatibilidade máxima
+        # -an: sem áudio (simplifica e evita erros)
         # -movflags +faststart: otimizar para streaming web
         command = [
             'ffmpeg',
@@ -79,10 +79,9 @@ def convert_video_to_mp4(input_content: bytes, input_filename: str) -> tuple[byt
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '23',
-            '-c:a', 'aac',
-            '-b:a', '128k',
+            '-pix_fmt', 'yuv420p',
+            '-an',  # Remover áudio - vídeos para TV geralmente não precisam
             '-movflags', '+faststart',
-            '-max_muxing_queue_size', '1024',
             temp_output_path
         ]
         
