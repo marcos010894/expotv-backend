@@ -66,7 +66,7 @@ export DB_PORT="3306"
 **Este é o passo mais importante!**
 
 ```bash
-python setup_database.py
+python migrations_old/setup_database.py
 ```
 
 Este script irá:
