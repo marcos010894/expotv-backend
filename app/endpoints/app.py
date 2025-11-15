@@ -450,49 +450,107 @@ def get_tv_intercalated_content(
     else:
         logging.info(f"TV {tv.nome}: proporcao_noticias = 0, pulando busca de notícias")
     
-    # 5. Intercalar conteúdo
+    # 5. Intercalar conteúdo em sequência cíclica respeitando proporções
     content = []
+
+    # Listas base
+    avisos_list = list(avisos)
+    anuncios_list = list(anuncios)
+    noticias_list = list(noticias)
+
+    # Índices de posição dentro de cada lista
     aviso_index = 0
     anuncio_index = 0
-    
-    # Calcular quantos ciclos precisamos
-    total_cycles = max(
-        (len(avisos) // tv.proporcao_avisos) if tv.proporcao_avisos > 0 else 0,
-        (len(anuncios) // tv.proporcao_anuncios) if tv.proporcao_anuncios > 0 else 0,
-        1  # Pelo menos 1 ciclo
+    noticia_index = 0
+
+    # Quantidade total de itens disponíveis
+    total_disponivel = len(avisos_list) + len(anuncios_list) + len(noticias_list)
+
+    # Se não há conteúdo, retorna vazio
+    if total_disponivel == 0:
+        return {
+            "success": True,
+            "tv": {
+                "id": tv.id,
+                "nome": tv.nome,
+                "codigo_conexao": tv.codigo_conexao,
+                "template": tv.template
+            },
+            "config": {
+                "proporcao_avisos": tv.proporcao_avisos,
+                "proporcao_anuncios": tv.proporcao_anuncios,
+                "proporcao_noticias": tv.proporcao_noticias,
+                "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s) : {tv.proporcao_noticias} notícia(s)"
+            },
+            "content": [],
+            "stats": {
+                "total_items": 0,
+                "avisos": 0,
+                "anuncios": 0,
+                "noticias": 0
+            }
+        }
+
+    # Montar sequência de tipos por ciclo, respeitando as proporções configuradas
+    tipo_ciclo = (
+        ["aviso"] * max(tv.proporcao_avisos, 0) +
+        ["anuncio"] * max(tv.proporcao_anuncios, 0) +
+        ["noticia"] * max(tv.proporcao_noticias, 0)
     )
-    
-    for cycle in range(total_cycles + 1):
-        # Adicionar avisos conforme proporção
-        for _ in range(tv.proporcao_avisos):
-            if aviso_index < len(avisos):
-                content.append({
-                    "type": "aviso",
-                    "data": avisos[aviso_index]
-                })
-                aviso_index += 1
-        
-        # Adicionar anúncios conforme proporção
-        for _ in range(tv.proporcao_anuncios):
-            if anuncio_index < len(anuncios):
-                content.append({
-                    "type": "anuncio",
-                    "data": anuncios[anuncio_index]
-                })
-                anuncio_index += 1
-        
-        # Se não tem mais conteúdo, parar
-        if aviso_index >= len(avisos) and anuncio_index >= len(anuncios):
-            break
-    
-    # Adicionar notícias no final
-    # Layout 1: TV exibe em rodapé/banner
-    # Layout 2: TV exibe em tela cheia
-    for noticia in noticias:
-        content.append({
-            "type": "noticia",
-            "data": noticia
-        })
+
+    # Se por alguma razão todas proporções forem zero, apenas concatena tudo
+    if not tipo_ciclo:
+        for aviso in avisos_list:
+            content.append({"type": "aviso", "data": aviso})
+        for anuncio in anuncios_list:
+            content.append({"type": "anuncio", "data": anuncio})
+        for noticia in noticias_list:
+            content.append({"type": "noticia", "data": noticia})
+    else:
+        # Vamos gerar até consumir todos os itens disponíveis
+        last_type = None
+        usados = {"aviso": 0, "anuncio": 0, "noticia": 0}
+
+        while len(content) < total_disponivel:
+            algum_adicionado_no_ciclo = False
+
+            for tipo in tipo_ciclo:
+                # Garantir que não repetimos o MESMO tipo em sequência
+                if tipo == last_type:
+                    continue
+
+                if tipo == "aviso" and usados["aviso"] < len(avisos_list):
+                    content.append({
+                        "type": "aviso",
+                        "data": avisos_list[usados["aviso"]]
+                    })
+                    usados["aviso"] += 1
+                    last_type = "aviso"
+                    algum_adicionado_no_ciclo = True
+                elif tipo == "anuncio" and usados["anuncio"] < len(anuncios_list):
+                    content.append({
+                        "type": "anuncio",
+                        "data": anuncios_list[usados["anuncio"]]
+                    })
+                    usados["anuncio"] += 1
+                    last_type = "anuncio"
+                    algum_adicionado_no_ciclo = True
+                elif tipo == "noticia" and usados["noticia"] < len(noticias_list):
+                    content.append({
+                        "type": "noticia",
+                        "data": noticias_list[usados["noticia"]]
+                    })
+                    usados["noticia"] += 1
+                    last_type = "noticia"
+                    algum_adicionado_no_ciclo = True
+
+                # Se já consumimos tudo, saímos
+                if len(content) >= total_disponivel:
+                    break
+
+            # Se em um ciclo completo não conseguimos adicionar nada novo, evitamos loop infinito
+            if not algum_adicionado_no_ciclo:
+                break
     
     return {
         "success": True,
