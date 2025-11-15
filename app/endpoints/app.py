@@ -438,23 +438,31 @@ def get_tv_intercalated_content(
         if tv.condominio_id in cond_ids:
             anuncios.append(anuncio)
     
-    # 4. Buscar notícias (se proporção configurada)
-    # Layout 1: Exibe em rodapé/banner
-    # Layout 2: Exibe em tela cheia
+    # 4. Buscar notícias (se proporção configurada **e** template suportar notícias)
+    # Layout 1: NÃO exibe notícias no conteúdo principal (somente avisos/anúncios)
+    # Layout 2: Exibe notícias (rodapé/tela cheia, conforme o frontend)
     # Usando APENAS notícias da Jovem Pan
     noticias = []
-    if tv.proporcao_noticias > 0:
+    pode_mostrar_noticias = (
+        tv.template is not None and str(tv.template).strip().lower() == "template 2".lower()
+    )
+
+    proporcao_noticias_efetiva = tv.proporcao_noticias if pode_mostrar_noticias else 0
+
+    if proporcao_noticias_efetiva > 0:
         # Para TV, buscamos MAIS notícias do que a proporção para ter variedade,
         # e usamos a proporção apenas para montar o ciclo de tipos.
         # Ex.: proporcao_noticias=1 -> ainda assim buscamos pelo menos 10 notícias.
-        base_limit = max(10, tv.proporcao_noticias * 3)
+        base_limit = max(10, proporcao_noticias_efetiva * 3)
         logging.info(
-            f"TV {tv.nome}: Buscando até {base_limit} notícias da Jovem Pan (proporcao_noticias={tv.proporcao_noticias})"
+            f"TV {tv.nome}: Buscando até {base_limit} notícias da Jovem Pan (proporcao_noticias={proporcao_noticias_efetiva}, template={tv.template})"
         )
         noticias = get_jovempan_news(limit=base_limit)
         logging.info(f"TV {tv.nome}: {len(noticias)} notícias encontradas da Jovem Pan")
     else:
-        logging.info(f"TV {tv.nome}: proporcao_noticias = 0, pulando busca de notícias")
+        logging.info(
+            f"TV {tv.nome}: Notícias desativadas para este template ou proporcao_noticias=0 (template={tv.template}, proporcao_noticias={tv.proporcao_noticias})"
+        )
     
     # 5. Intercalar conteúdo em sequência cíclica respeitando proporções,
     #    usando índices circulares para poder repetir itens quando necessário.
@@ -494,7 +502,7 @@ def get_tv_intercalated_content(
     tipo_ciclo = (
         ["aviso"] * max(tv.proporcao_avisos, 0) +
         ["anuncio"] * max(tv.proporcao_anuncios, 0) +
-        ["noticia"] * max(tv.proporcao_noticias, 0)
+        ["noticia"] * max(proporcao_noticias_efetiva, 0)
     )
 
     # Se proporções forem todas zero, apenas concatena as listas
@@ -592,8 +600,8 @@ def get_tv_intercalated_content(
         "config": {
             "proporcao_avisos": tv.proporcao_avisos,
             "proporcao_anuncios": tv.proporcao_anuncios,
-            "proporcao_noticias": tv.proporcao_noticias,
-            "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s) : {tv.proporcao_noticias} notícia(s)"
+            "proporcao_noticias": proporcao_noticias_efetiva,
+            "descricao": f"{tv.proporcao_avisos} aviso(s) : {tv.proporcao_anuncios} anúncio(s) : {proporcao_noticias_efetiva} notícia(s)"
         },
         "content": content,
         "stats": {
