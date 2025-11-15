@@ -444,30 +444,28 @@ def get_tv_intercalated_content(
     # Usando APENAS notícias da Jovem Pan
     noticias = []
     if tv.proporcao_noticias > 0:
-        logging.info(f"TV {tv.nome}: Buscando {tv.proporcao_noticias} notícias da Jovem Pan")
-        noticias = get_jovempan_news(limit=tv.proporcao_noticias)
+        # Para TV, buscamos MAIS notícias do que a proporção para ter variedade,
+        # e usamos a proporção apenas para montar o ciclo de tipos.
+        # Ex.: proporcao_noticias=1 -> ainda assim buscamos pelo menos 10 notícias.
+        base_limit = max(10, tv.proporcao_noticias * 3)
+        logging.info(
+            f"TV {tv.nome}: Buscando até {base_limit} notícias da Jovem Pan (proporcao_noticias={tv.proporcao_noticias})"
+        )
+        noticias = get_jovempan_news(limit=base_limit)
         logging.info(f"TV {tv.nome}: {len(noticias)} notícias encontradas da Jovem Pan")
     else:
         logging.info(f"TV {tv.nome}: proporcao_noticias = 0, pulando busca de notícias")
     
-    # 5. Intercalar conteúdo em sequência cíclica respeitando proporções
+    # 5. Intercalar conteúdo em sequência cíclica respeitando proporções,
+    #    usando índices circulares para poder repetir itens quando necessário.
     content = []
 
-    # Listas base
     avisos_list = list(avisos)
     anuncios_list = list(anuncios)
     noticias_list = list(noticias)
 
-    # Índices de posição dentro de cada lista
-    aviso_index = 0
-    anuncio_index = 0
-    noticia_index = 0
-
-    # Quantidade total de itens disponíveis
-    total_disponivel = len(avisos_list) + len(anuncios_list) + len(noticias_list)
-
-    # Se não há conteúdo, retorna vazio
-    if total_disponivel == 0:
+    # Se não há nenhum conteúdo, retorna vazio
+    if not avisos_list and not anuncios_list and not noticias_list:
         return {
             "success": True,
             "tv": {
@@ -491,14 +489,15 @@ def get_tv_intercalated_content(
             }
         }
 
-    # Montar sequência de tipos por ciclo, respeitando as proporções configuradas
+    # Sequência de tipos de um ciclo com base na configuração da TV
+    # Ex.: 1:3:1 -> ['aviso', 'anuncio', 'anuncio', 'anuncio', 'noticia']
     tipo_ciclo = (
         ["aviso"] * max(tv.proporcao_avisos, 0) +
         ["anuncio"] * max(tv.proporcao_anuncios, 0) +
         ["noticia"] * max(tv.proporcao_noticias, 0)
     )
 
-    # Se por alguma razão todas proporções forem zero, apenas concatena tudo
+    # Se proporções forem todas zero, apenas concatena as listas
     if not tipo_ciclo:
         for aviso in avisos_list:
             content.append({"type": "aviso", "data": aviso})
@@ -507,50 +506,80 @@ def get_tv_intercalated_content(
         for noticia in noticias_list:
             content.append({"type": "noticia", "data": noticia})
     else:
-        # Vamos gerar até consumir todos os itens disponíveis
-        last_type = None
-        usados = {"aviso": 0, "anuncio": 0, "noticia": 0}
+        # Tamanho alvo da playlist: pelo menos 30 itens ou o total natural, o que for maior
+        total_natural = len(avisos_list) + len(anuncios_list) + len(noticias_list)
+        target_size = max(total_natural, 30)
 
-        while len(content) < total_disponivel:
-            algum_adicionado_no_ciclo = False
+        # Índices circulares em cada lista
+        idx_aviso = 0
+        idx_anuncio = 0
+        idx_noticia = 0
+
+        # Loop até atingir o tamanho alvo
+        while len(content) < target_size:
+            adicionou_no_ciclo = False
 
             for tipo in tipo_ciclo:
-                # Garantir que não repetimos o MESMO tipo em sequência
-                if tipo == last_type:
-                    continue
-
-                if tipo == "aviso" and usados["aviso"] < len(avisos_list):
+                if tipo == "aviso" and avisos_list:
+                    # Se só existe 1 aviso e já usamos ele neste ciclo, pula para não repetir o MESMO
+                    if len(avisos_list) == 1 and adicionou_no_ciclo:
+                        continue
                     content.append({
                         "type": "aviso",
-                        "data": avisos_list[usados["aviso"]]
+                        "data": avisos_list[idx_aviso]
                     })
-                    usados["aviso"] += 1
-                    last_type = "aviso"
-                    algum_adicionado_no_ciclo = True
-                elif tipo == "anuncio" and usados["anuncio"] < len(anuncios_list):
+                    idx_aviso = (idx_aviso + 1) % len(avisos_list)
+                    adicionou_no_ciclo = True
+                elif tipo == "anuncio" and anuncios_list:
+                    if len(anuncios_list) == 1 and adicionou_no_ciclo:
+                        continue
                     content.append({
                         "type": "anuncio",
-                        "data": anuncios_list[usados["anuncio"]]
+                        "data": anuncios_list[idx_anuncio]
                     })
-                    usados["anuncio"] += 1
-                    last_type = "anuncio"
-                    algum_adicionado_no_ciclo = True
-                elif tipo == "noticia" and usados["noticia"] < len(noticias_list):
+                    idx_anuncio = (idx_anuncio + 1) % len(anuncios_list)
+                    adicionou_no_ciclo = True
+                elif tipo == "noticia" and noticias_list:
+                    # Para notícias, permitimos repetir mesmo se houver apenas 1 item,
+                    # pois é melhor ter notícia aparecendo na TV do que sumir da playlist.
                     content.append({
                         "type": "noticia",
-                        "data": noticias_list[usados["noticia"]]
+                        "data": noticias_list[idx_noticia]
                     })
-                    usados["noticia"] += 1
-                    last_type = "noticia"
-                    algum_adicionado_no_ciclo = True
+                    idx_noticia = (idx_noticia + 1) % len(noticias_list)
+                    adicionou_no_ciclo = True
 
-                # Se já consumimos tudo, saímos
-                if len(content) >= total_disponivel:
+                if len(content) >= target_size:
                     break
 
-            # Se em um ciclo completo não conseguimos adicionar nada novo, evitamos loop infinito
-            if not algum_adicionado_no_ciclo:
-                break
+            # Se neste ciclo não conseguimos adicionar nada (por exemplo só tem 1 item de um tipo),
+            # então permitimos repetir o mesmo item para não travar a geração.
+            if not adicionou_no_ciclo:
+                for tipo in tipo_ciclo:
+                    if tipo == "aviso" and avisos_list:
+                        content.append({
+                            "type": "aviso",
+                            "data": avisos_list[idx_aviso]
+                        })
+                        idx_aviso = (idx_aviso + 1) % len(avisos_list)
+                    elif tipo == "anuncio" and anuncios_list:
+                        content.append({
+                            "type": "anuncio",
+                            "data": anuncios_list[idx_anuncio]
+                        })
+                        idx_anuncio = (idx_anuncio + 1) % len(anuncios_list)
+                    elif tipo == "noticia" and noticias_list:
+                        content.append({
+                            "type": "noticia",
+                            "data": noticias_list[idx_noticia]
+                        })
+                        idx_noticia = (idx_noticia + 1) % len(noticias_list)
+
+                    if len(content) >= target_size:
+                        break
+
+                if len(content) >= target_size:
+                    break
     
     return {
         "success": True,
