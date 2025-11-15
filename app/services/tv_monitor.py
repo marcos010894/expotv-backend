@@ -55,17 +55,17 @@ def check_offline_tvs():
 def start_tv_monitor():
     """
     Inicia o monitoramento de TVs em background
-    Verifica a cada 1 minuto
+    Verifica a cada 10 minutos
     """
     from apscheduler.schedulers.background import BackgroundScheduler
     
     scheduler = BackgroundScheduler()
     
-    # Executar a cada 1 minuto
+    # Executar a cada 10 minutos
     scheduler.add_job(
         check_offline_tvs,
         'interval',
-        minutes=1,
+        minutes=10,
         id='tv_monitor',
         name='Monitor de Status de TVs',
         replace_existing=True
@@ -75,6 +75,6 @@ def start_tv_monitor():
     check_offline_tvs()
     
     scheduler.start()
-    logger.info("📺 Monitor de TVs iniciado - Verificando a cada 1 minuto")
+    logger.info("📺 Monitor de TVs iniciado - Verificando a cada 10 minutos")
     
     return scheduler

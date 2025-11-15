@@ -2,102 +2,157 @@
 
 Sistema de gerenciamento de conteúdo para TVs corporativas com suporte a avisos, anúncios e notícias.
 
-## Tecnologias
+## 📚 Documentação
+
+**[Acesse a documentação completa aqui →](docs/INDEX.md)**
+
+### Links Rápidos
+- 📖 [Guia de Instalação](docs/guias/INSTALL.md)
+- 🔌 [Documentação da API](docs/api/GUIA_API.md)
+- 🚀 [Guia de Deploy](docs/deploy/DEPLOY_FLYIO_FFMPEG.md)
+- 🎬 [Conversão de Vídeos](docs/guias/CONVERSAO_VIDEO.md)
+- ⚙️ [Configuração de Ambiente](docs/guias/ENV_SETUP.md)
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/marcos010894/expotv-backend.git
+cd expotv-backend
+
+# 2. Instale FFmpeg
+./scripts/install-ffmpeg.sh
+
+# 3. Configure ambiente
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 4. Configure variáveis de ambiente
+cp .env.example .env
+# Edite o .env com suas configurações
+
+# 5. Execute
+uvicorn app.main:app --reload
+```
+
+Acesse: http://localhost:8000/docs
+
+## 🛠️ Tecnologias
 
 - **Python 3.13**
 - **FastAPI** - Framework web moderno e rápido
 - **SQLModel** - ORM baseado em Pydantic e SQLAlchemy
 - **MySQL** - Banco de dados relacional
-- **Cloudflare R2** - Storage de arquivos
+- **Cloudflare R2** - Storage de arquivos (S3-compatible)
 - **APScheduler** - Tarefas agendadas (monitoramento)
 - **JWT** - Autenticação de usuários
+- **FFmpeg** - Conversão automática de vídeos
 
-## Pré-requisitos
+## 📁 Estrutura do Projeto
 
-- Python 3.13 ou superior
-- MySQL 8.0 ou superior
-- FFmpeg (para conversão automática de vídeos)
-- Git
-
-## Instalação
-
-### 1. Clone o repositório
-
-```bash
-git clone .EsteREPO
-cd expotv-backend
+```
+BACKEND/
+├── app/                    # Código fonte
+│   ├── endpoints/          # Rotas da API
+│   ├── models.py           # Modelos do banco
+│   └── main.py            # Aplicação FastAPI
+├── docs/                   # 📚 Documentação completa
+│   ├── api/               # Docs da API
+│   ├── deploy/            # Guias de deploy
+│   └── guias/             # Tutoriais
+├── scripts/               # Scripts utilitários
+├── examples/              # Exemplos de código
+├── tests/                 # Testes
+├── Dockerfile             # Imagem Docker
+├── fly.toml              # Config Fly.io
+└── requirements.txt      # Dependências
 ```
 
-### 2. Instale o FFmpeg
+## 🔥 Funcionalidades
 
-O sistema converte automaticamente todos os vídeos para MP4 antes de salvar.
+- ✅ CRUD completo de Anúncios, Avisos e TVs
+- ✅ Sistema de proporção inteligente (ex: 1 aviso : 5 anúncios : 3 notícias)
+- ✅ Upload de imagens e vídeos com conversão automática para MP4
+- ✅ Integração com Jovem Pan (notícias)
+- ✅ Monitoramento automático de TVs online/offline
+- ✅ Expiração automática de conteúdo
+- ✅ Autenticação JWT
+- ✅ Sistema de níveis de usuário (Master, Síndico, Visitante)
+- ✅ Cloudflare R2 para storage
+- ✅ Health checks automáticos
 
-**macOS:**
-```bash
-brew install ffmpeg
-# ou execute o script
-./install-ffmpeg.sh
-```
+## 🌐 API Endpoints
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install -y ffmpeg
-# ou execute o script
-./install-ffmpeg.sh
-```
+Documentação interativa disponível em: **http://localhost:8000/docs**
 
-**Windows:**
-- Baixe de: https://ffmpeg.org/download.html
-- Adicione ao PATH do sistema
+Principais endpoints:
+- `/auth/*` - Autenticação e usuários
+- `/anuncios/*` - Gerenciamento de anúncios  
+- `/avisos/*` - Gerenciamento de avisos
+- `/condominios/*` - Gerenciamento de condomínios
+- `/tvs/*` - Gerenciamento de TVs
+- `/app/*` - Endpoints para o app mobile/TV
 
-Verifique a instalação:
-```bash
-ffmpeg -version
-```
+## 🚀 Deploy
 
-### 3. Crie e ative o ambiente virtual
-
-**macOS/Linux:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-**Windows:**
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-### 4. Instale as dependências
+### Produção (Fly.io)
 
 ```bash
-pip install -r requirements.txt
+# Deploy automático via GitHub
+git push origin main
+
+# Ou via CLI
+flyctl deploy
 ```
 
-### 5. Configure as variáveis de ambiente
+[Ver guia completo de deploy →](docs/deploy/DEPLOY_FLYIO_FFMPEG.md)
 
-Copie o arquivo de exemplo e configure suas credenciais:
+## 🧪 Testes
 
 ```bash
-cp .env.example .env
+pytest tests/
 ```
 
-Edite o arquivo `.env` com suas configurações:
+## 📜 Scripts Úteis
 
-```env
-# Banco de Dados MySQL
-DB_USER=seu_usuario
-DB_PASSWORD=sua_senha
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=expotv
+Localizados em `/scripts/`:
 
-# Email SMTP (Gmail)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=seu_email@gmail.com
+```bash
+# Criar usuário master
+python scripts/create_master.py
+
+# Criar tabelas
+python scripts/create_tables.py
+
+# Limpar avisos expirados
+python scripts/limpar_avisos.py
+
+# Migrar proporções das TVs
+python scripts/migrate_tv_proporcoes.py
+```
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
+3. Commit suas mudanças (`git commit -m 'Add: Nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/NovaFuncionalidade`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Todos os direitos reservados © 2025 EXPO TV
+
+## 📞 Suporte
+
+- 📚 [Documentação Completa](docs/INDEX.md)
+- 🐛 [Reportar Bug](https://github.com/marcos010894/expotv-backend/issues)
+- 💬 Dúvidas: Entre em contato com a equipe
+
+---
+
+**Desenvolvido com ❤️ para EXPO TV**
 SMTP_PASSWORD=sua_senha_app
 FROM_EMAIL=seu_email@gmail.com
 FROM_NAME=EXPO TV
